@@ -15,6 +15,15 @@ musicbrainzngs.set_useragent(
 )
 
 
+def _safe_get_dict(dictionary, *attributes):
+    try:
+        for key in attributes:
+            dictionary = dictionary[key]
+        return dictionary
+    except(TypeError, KeyError):
+        return None
+
+
 class RecordingDatePlugin(BeetsPlugin):
     def __init__(self):
         super(RecordingDatePlugin, self).__init__()
@@ -68,14 +77,13 @@ class RecordingDatePlugin(BeetsPlugin):
             self._log.info(u'Skipping track with no mb_trackid: {0}',
                            item_formatted)
             return
-        # check for the recording_year and if it exists and not empty
-        # skips the track if force is not configured
+        # check for the recording_year and if it exists and not empty skips the track if force is not configured
         if u'recording_year' in item and item.recording_year and not self.config['force']:
             self._log.info(u'Skipping already processed track: {0}', item_formatted)
             return
 
         # Get the MusicBrainz recording info.
-        (recording_date, disambig) = self._get_first_recording_year(item.mb_trackid)
+        recording_date = self._get_first_recording_year(item.mb_trackid, item.recording_year)
 
         if not recording_date:
             self._log.info(u'Recording ID not found: {0} for track {0}',
@@ -94,9 +102,6 @@ class RecordingDatePlugin(BeetsPlugin):
                     self._log.info(u'overwriting year field for: {0} to {1}', item_formatted,
                                    recording_date[recording_field])
                 write = True
-        if disambig is not None:
-            item[u'recording_disambiguation'] = str(disambig)
-            write = True
         if write:
             self._log.info(u'Applying changes to {0}', item_formatted)
             item.write()
@@ -117,121 +122,56 @@ class RecordingDatePlugin(BeetsPlugin):
                 date_values[key] = date_num
         return date_values
 
-    #########################################################################################
-    # Unused function
-    def _recurse_relations(self, mb_track_id, oldest_release, relation_type):
-        x = musicbrainzngs.get_recording_by_id(
-            mb_track_id,
-            includes=["releases", "recording-rels"]
-        )
-
-        for key in x['recording'].keys():
-            self._log.info(u'Key {0} Value {1}', key, x['recording'][key])
-
-        if not x['recording']['recording-relation-list']:
-            self._log.info(u'No Recording relations list!')
-
-        if 'recording-relation-list' in x['recording'].keys():
-            # recurse down into edits and remasters.
-            # Note remasters are deprecated in musicbrainz, but some entries
-            # may still exist.
-            for subrecording in x['recording']['recording-relation-list']:
-                if ('direction' in subrecording.keys() and
-                        subrecording['direction'] == 'backward'):
-                    self._log.info(u'Ignoring backwards relationship')
-                    continue
-                # skip new relationship category samples
-                if subrecording['type'] not in self.config['relations'].as_str_seq():
-                    self._log.info(u'Skipping unwanted subrecording type {0}', subrecording['type'])
-                    continue
-                if 'artist' in x['recording'].keys() and x['recording']['artist'] != subrecording['artist']:
-                    self._log.info(
-                        u'Skipping relation with artist {0} that does not match {1}',
-                        subrecording['artist'], x['recording']['artist'])
-                    continue
-                (oldest_release, relation_type) = self._recurse_relations(
-                    subrecording['target'],
-                    oldest_release,
-                    subrecording['type'])
-        for release in x['recording']['release-list']:
-            if 'date' not in release.keys():
-                # A release without a date. Skip over it.
-                self._log.info(u'Release without date: {0}, skipping it', release['date'])
-                continue
-            release_date = self._make_date_values(release['date'])
-            self._log.info(u'Is {0} > {1}?', oldest_release['year'], release_date['year'])
-            if (oldest_release['year'] is None or
-                    oldest_release['year'] > release_date['year']):
-                oldest_release = release_date
-            elif oldest_release['year'] == release_date['year']:
-                if ('month' in release_date.keys() and
-                        'month' in oldest_release.keys() and
-                        oldest_release['month'] > release_date['month']):
-                    oldest_release = release_date
-        return oldest_release, relation_type
-
-    ##################################################################################################################
-
-    def _get_first_recording_year(self, mb_track_id):
-        relation_type = None
-
+    def _get_first_recording_year(self, recording_id, recording_year):
         # Get recording by Id
-        recording = musicbrainzngs.get_recording_by_id(mb_track_id, includes=["artists", "work-rels"])
-        original_artist = recording['recording']['artist-credit']
+        recording = musicbrainzngs.get_recording_by_id(recording_id, includes=["artists"])['recording']
+        self._log.debug('Original Recording: {0}', recording)
 
-        if 'work-relation-list' not in recording['recording']:
-            self._log.info('No work relations! Please add them on MusicBrainz for {0}', recording['recording'])
-            return
+        artist_names = []
+        artist_id_set = set()
+        for artist in recording['artist-credit']:
+            artist_names.append(artist['artist']['name'])
+            artist_id_set.add(artist['artist']['id'])
 
-        # Get all works that are songs
-        songs = [work['work'] for work in recording['recording']['work-relation-list'] if
-                 work['work']['type'] == 'Song']
-        self._log.debug(u'Songs: {0}', len(songs))
+        self._log.debug("artist names: {0},; artist ids: {1}", artist_names, artist_id_set)
 
-        for work in songs:
-            self._log.debug(u'Song: {0}', work)
-
-        # Get Id of first song found
-        song_id = songs[0]['id']
-        self._log.debug(u'Song Id: {0}', song_id)
-
-        # Get all recordings for this song
-        work = musicbrainzngs.get_work_by_id(song_id, includes=["release-rels", "recording-rels"])
-
-        # Filter out recordings with a different author
-        # To get the author it seems we have to fetch each recording individually...
-        recordings = []
-        for recordingRelation in work['work']['recording-relation-list']:
-            recording_id = recordingRelation['recording']['id']
-            recording = musicbrainzngs.get_recording_by_id(recording_id, includes=["artists", "releases"])['recording']
-            if original_artist == recording['artist-credit']:
-                recordings.append(recording)
-                break
-
-        self._log.info('Filtered: ')
-        for recording in recordings:
-            self._log.info(u'Recording: {0}', recording)
-
-        # If there's no recordings use already found one
-        if len(recordings) <= 0: recordings.append(recording)
-
-        # Assume first recording is the oldest
-        oldest_recording_id = recordings[0]
-
-        # Get releases for this recording
-        releases = oldest_recording_id['release-list']
+        # Search for this song by exact name and artist
+        releases = musicbrainzngs.search_releases(query=recording['title'], strict=True, artistname=artist_names)[
+            'release-list']
 
         oldest_release_date = datetime.date.today()
 
         for release in releases:
+            if release['status'] != 'Official':
+                releases.remove(release)
+                continue
+
+            missing_artist = False
+            for artist in release['artist-credit']:
+                self._log.debug('Artist: {0}', artist)
+                current_artist_id = _safe_get_dict(artist, 'artist', 'id')
+                if current_artist_id not in artist_id_set:
+                    missing_artist = True
+                    break
+
+            if missing_artist:
+                releases.remove(release)
+                continue
+
+            self._log.debug('Title: {0}, Status: {1}, Date: {2}', release['title'],
+                            release['status'], release['date'])
+
             release_date = parser.isoparse(release['date']).date()
-            self._log.info(u'Release: {0}', release_date)
+            self._log.debug(u'Release date: {0}', release_date)
             if release_date < oldest_release_date:
                 oldest_release_date = release_date
 
         oldest_release = {'year': oldest_release_date.year, 'month': oldest_release_date.month,
                           'day': oldest_release_date.day}
+
+        self._log.debug('Original Year: {0}     Oldest Release Year: {1}', recording_year, oldest_release['year'])
+
         if oldest_release_date == datetime.date.today():
             self._log.error('Could not find date information for {0}', recording)
             oldest_release = {'year': None, 'month': None, 'day': None}
-        return oldest_release, relation_type
+        return oldest_release
