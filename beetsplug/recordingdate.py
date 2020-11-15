@@ -117,6 +117,8 @@ class RecordingDatePlugin(BeetsPlugin):
                 date_values[key] = date_num
         return date_values
 
+    #########################################################################################
+    # Unused function
     def _recurse_relations(self, mb_track_id, oldest_release, relation_type):
         x = musicbrainzngs.get_recording_by_id(
             mb_track_id,
@@ -166,41 +168,43 @@ class RecordingDatePlugin(BeetsPlugin):
                         'month' in oldest_release.keys() and
                         oldest_release['month'] > release_date['month']):
                     oldest_release = release_date
-        return (oldest_release, relation_type)
+        return oldest_release, relation_type
+
+    ##################################################################################################################
 
     def _get_first_recording_year(self, mb_track_id):
-        oldest_release = {'year': None, 'month': None, 'day': None}
         relation_type = None
 
         # Get recording by Id
-        x = musicbrainzngs.get_recording_by_id(mb_track_id, includes=["artists", "work-rels"])
-        originalArtist = x['recording']['artist-credit']
+        recording = musicbrainzngs.get_recording_by_id(mb_track_id, includes=["artists", "work-rels"])
+        original_artist = recording['recording']['artist-credit']
 
-        if 'work-relation-list' not in x['recording']:
-            self._log.info('No work relations! Please add them on MusicBrainz for {0}', x['recording'])
+        if 'work-relation-list' not in recording['recording']:
+            self._log.info('No work relations! Please add them on MusicBrainz for {0}', recording['recording'])
             return
 
         # Get all works that are songs
-        songs = [work['work'] for work in x['recording']['work-relation-list'] if work['work']['type'] == 'Song']
+        songs = [work['work'] for work in recording['recording']['work-relation-list'] if
+                 work['work']['type'] == 'Song']
         self._log.debug(u'Songs: {0}', len(songs))
 
         for work in songs:
             self._log.debug(u'Song: {0}', work)
 
         # Get Id of first song found
-        songId = songs[0]['id']
-        self._log.debug(u'Song Id: {0}', songId)
+        song_id = songs[0]['id']
+        self._log.debug(u'Song Id: {0}', song_id)
 
         # Get all recordings for this song
-        work = musicbrainzngs.get_work_by_id(songId, includes=["release-rels", "recording-rels"])
+        work = musicbrainzngs.get_work_by_id(song_id, includes=["release-rels", "recording-rels"])
 
         # Filter out recordings with a different author
         # To get the author it seems we have to fetch each recording individually...
         recordings = []
         for recordingRelation in work['work']['recording-relation-list']:
-            recordingId = recordingRelation['recording']['id']
-            recording = musicbrainzngs.get_recording_by_id(recordingId, includes=["artists", "releases"])['recording']
-            if (originalArtist == recording['artist-credit']):
+            recording_id = recordingRelation['recording']['id']
+            recording = musicbrainzngs.get_recording_by_id(recording_id, includes=["artists", "releases"])['recording']
+            if original_artist == recording['artist-credit']:
                 recordings.append(recording)
                 break
 
@@ -209,25 +213,25 @@ class RecordingDatePlugin(BeetsPlugin):
             self._log.info(u'Recording: {0}', recording)
 
         # If there's no recordings use already found one
-        if (len(recordings) <= 0): recordings.append(x)
+        if len(recordings) <= 0: recordings.append(recording)
 
         # Assume first recording is the oldest
-        oldestRecordingId = recordings[0]
+        oldest_recording_id = recordings[0]
 
         # Get releases for this recording
-        releases = oldestRecordingId['release-list']
+        releases = oldest_recording_id['release-list']
 
-        oldestReleaseDate = datetime.date.today()
+        oldest_release_date = datetime.date.today()
 
         for release in releases:
-            releaseDate = parser.isoparse(release['date']).date()
-            self._log.info(u'Release: {0}', releaseDate)
-            if (releaseDate < oldestReleaseDate):
-                oldestReleaseDate = releaseDate
+            release_date = parser.isoparse(release['date']).date()
+            self._log.info(u'Release: {0}', release_date)
+            if release_date < oldest_release_date:
+                oldest_release_date = release_date
 
-        oldest_release = {'year': oldestReleaseDate.year, 'month': oldestReleaseDate.month,
-                          'day': oldestReleaseDate.day}
-        if (oldestReleaseDate == datetime.date.today()):
+        oldest_release = {'year': oldest_release_date.year, 'month': oldest_release_date.month,
+                          'day': oldest_release_date.day}
+        if oldest_release_date == datetime.date.today():
             self._log.error('Could not find date information for {0}', recording)
             oldest_release = {'year': None, 'month': None, 'day': None}
-        return (oldest_release, relation_type)
+        return oldest_release, relation_type
