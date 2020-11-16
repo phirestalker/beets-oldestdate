@@ -15,13 +15,27 @@ musicbrainzngs.set_useragent(
 )
 
 
-def _safe_get_dict(dictionary, *attributes):
+def _get_dict(dictionary, *attributes):
     try:
         for key in attributes:
             dictionary = dictionary[key]
         return dictionary
     except(TypeError, KeyError):
         return None
+
+
+def _make_date_values(date_str):
+    date_parts = date_str.split('-')
+    date_values = {'year': 0, 'month': 0, 'day': 0}
+    for key in ('year', 'month', 'day'):
+        if date_parts:
+            date_part = date_parts.pop(0)
+            try:
+                date_num = int(date_part)
+            except ValueError:
+                continue
+            date_values[key] = date_num
+    return date_values
 
 
 class RecordingDatePlugin(BeetsPlugin):
@@ -34,16 +48,16 @@ class RecordingDatePlugin(BeetsPlugin):
             'auto': True,
             'force': False,
             'write_over': False,
-            'relations': {'edit', 'first track release', 'remaster'},
         })
-        # grab global MusicBrainz host setting
+
+        # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
         musicbrainzngs.set_rate_limit(1, config['musicbrainz']['ratelimit'].get())
         for recording_field in (
-                u'recording_year',
-                u'recording_month',
-                u'recording_day',
-                u'recording_disambiguation'):
+                'recording_year',
+                'recording_month',
+                'recording_day',
+                'recording_disambiguation'):
             field = mediafile.MediaField(
                 mediafile.MP3DescStorageStyle(recording_field),
                 mediafile.MP4StorageStyle('----:com.apple.iTunes:{}'.format(
@@ -54,7 +68,7 @@ class RecordingDatePlugin(BeetsPlugin):
     def commands(self):
         recording_date_command = ui.Subcommand(
             'recordingdate',
-            help="Retrieve the date of the first known recording of a track.",
+            help="Retrieve the date of the first known release of a track.",
             aliases=['rdate'])
         recording_date_command.func = self.func
         return [recording_date_command]
@@ -77,57 +91,46 @@ class RecordingDatePlugin(BeetsPlugin):
         item_formatted = format(item)
 
         if not item.mb_trackid:
-            self._log.info(u'Skipping track with no mb_trackid: {0}',
+            self._log.info('Skipping track with no mb_trackid: {0}',
                            item_formatted)
             return
-        # check for the recording_year and if it exists and not empty skips the track if force is not configured
-        if u'recording_year' in item and item.recording_year and not self.config['force']:
-            self._log.info(u'Skipping already processed track: {0}', item_formatted)
+
+        # Check for the recording_year and if it exists and not empty skips the track (if force is not True)
+        if 'recording_year' in item and item.recording_year and not self.config['force']:
+            self._log.info('Skipping already processed track: {0}', item_formatted)
             return
 
         # Get the MusicBrainz recording info.
-        recording_date = self._get_first_recording_year(item.mb_trackid, item.recording_year)
+        recording_date = self._get_oldest_release_date(item.mb_trackid, item.recording_year)
 
         if not recording_date:
-            self._log.info(u'Recording ID not found: {0} for track {0}',
+            self._log.info('Recording ID not found: {0} for track {0}',
                            item.mb_trackid,
                            item_formatted)
             return
+
         # Apply.
         write = False
         for recording_field in ('year', 'month', 'day'):
             if recording_field in recording_date.keys():
-                item[u'recording_' +
-                     recording_field] = recording_date[recording_field]
-                # writes over the year tag if configured
-                if self.config['write_over'] and recording_field == u'year':
+                item['recording_' + recording_field] = recording_date[recording_field]
+
+                # Write over the year tag if configured
+                if self.config['write_over'] and recording_field == 'year':
                     item[recording_field] = recording_date[recording_field]
-                    self._log.info(u'overwriting year field for: {0} to {1}', item_formatted,
+                    self._log.info('Overwriting year field for: {0} to {1}', item_formatted,
                                    recording_date[recording_field])
                 write = True
         if write:
-            self._log.info(u'Applying changes to {0}', item_formatted)
+            self._log.info('Applying changes to {0}', item_formatted)
             item.write()
             item.store()
             if not self.importing:
                 item.write()
         else:
-            self._log.info(u'Error: {0}', recording_date)
+            self._log.info('Error: {0}', recording_date)
 
-    def _make_date_values(self, date_str):
-        date_parts = date_str.split('-')
-        date_values = {'year': 0, 'month': 0, 'day': 0}
-        for key in ('year', 'month', 'day'):
-            if date_parts:
-                date_part = date_parts.pop(0)
-                try:
-                    date_num = int(date_part)
-                except ValueError:
-                    continue
-                date_values[key] = date_num
-        return date_values
-
-    def _get_first_recording_year(self, recording_id, recording_year):
+    def _get_oldest_release_date(self, recording_id, recording_year):
         # Get recording by Id
         recording = musicbrainzngs.get_recording_by_id(recording_id, includes=["artists"])['recording']
         self._log.debug('Original Recording: {0}', recording)
@@ -154,7 +157,7 @@ class RecordingDatePlugin(BeetsPlugin):
             missing_artist = False
             for artist in release['artist-credit']:
                 self._log.debug('Artist: {0}', artist)
-                current_artist_id = _safe_get_dict(artist, 'artist', 'id')
+                current_artist_id = _get_dict(artist, 'artist', 'id')
                 if current_artist_id not in artist_id_set:
                     missing_artist = True
                     break
