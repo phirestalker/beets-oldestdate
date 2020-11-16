@@ -101,10 +101,9 @@ class RecordingDatePlugin(BeetsPlugin):
             self._log.info('Skipping already processed track: {0}', item_formatted)
             return
 
-        self._log.debug('Item: {0}', item)
-
         # Get the MusicBrainz recording info.
-        recording_date = self._get_oldest_release_date(item.mb_trackid, item.recording_year)
+        recording_date = self._get_oldest_release_date(item.title, item.recording_year, item.artist, item.mb_artistid)
+        # mb_albumartistid, artist_credit
 
         if not recording_date:
             self._log.info('Recording ID not found: {0} for track {0}',
@@ -133,22 +132,10 @@ class RecordingDatePlugin(BeetsPlugin):
         else:
             self._log.info('Error: {0}', recording_date)
 
-    def _get_oldest_release_date(self, recording_id, recording_year):
-        # Get recording by Id
-        recording = musicbrainzngs.get_recording_by_id(recording_id, includes=["artists"])['recording']
-        self._log.debug('Original Recording: {0}', recording)
-
-        artist_names = []
-        artist_id_set = set()
-        for artist in recording['artist-credit']:
-            artist_names.append(_get_dict(artist, 'artist', 'name'))
-            artist_id_set.add(_get_dict(artist, 'artist', 'id'))
-
-        self._log.debug("artist names: {0},; artist ids: {1}", artist_names, artist_id_set)
-
+    def _get_oldest_release_date(self, title, recording_year, artist, artist_id):
         # Search for this song by exact name and artist
         # TODO We need to also check if the song belongs to an album, when that album was released
-        releases = musicbrainzngs.search_releases(query=recording['title'], strict=True, artistname=artist_names,
+        releases = musicbrainzngs.search_releases(query=title, strict=True, artist=artist,
                                                   limit=100)['release-list']
 
         oldest_release_date = datetime.date.today()
@@ -158,15 +145,15 @@ class RecordingDatePlugin(BeetsPlugin):
                 releases.remove(release)
                 continue
 
-            missing_artist = False
+            artist_found = False
+
             for artist in _get_dict(release, 'artist-credit'):
-                self._log.debug('Artist: {0}', artist)
                 current_artist_id = _get_dict(artist, 'artist', 'id')
-                if current_artist_id not in artist_id_set:
-                    missing_artist = True
+                if current_artist_id == artist_id:
+                    artist_found = True
                     break
 
-            if missing_artist:
+            if not artist_found:
                 releases.remove(release)
                 continue
 
@@ -184,6 +171,6 @@ class RecordingDatePlugin(BeetsPlugin):
         self._log.debug('Original Year: {0}     Oldest Release Year: {1}', recording_year, oldest_release['year'])
 
         if oldest_release_date == datetime.date.today():
-            self._log.error('Could not find date information for {0}', recording)
+            self._log.error('Could not find date information for {0} - {1}', artist, title)
             oldest_release = {'year': None, 'month': None, 'day': None}
         return oldest_release
