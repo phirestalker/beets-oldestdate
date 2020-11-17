@@ -48,7 +48,7 @@ class RecordingDatePlugin(BeetsPlugin):
             'auto': True,
             'force': False,
             'write_over': False,
-            'search_releases': False
+            'approach': 'hybrid'  # recordings, releases, hybrid, both
         })
 
         # Get global MusicBrainz host setting
@@ -90,47 +90,42 @@ class RecordingDatePlugin(BeetsPlugin):
                 self.process_file(item)
 
     def process_file(self, item):
-        item_formatted = format(item)
-
         if not item.mb_trackid:
-            self._log.info('Skipping track with no mb_trackid: {0}',
-                           item_formatted)
+            self._log.info('Skipping track with no mb_trackid: {0.artist} - {0.title}',
+                           item)
             return
 
         # Check for the recording_year and if it exists and not empty skips the track (if force is not True)
         if 'recording_year' in item and item.recording_year and not self.config['force']:
-            self._log.info('Skipping already processed track: {0}', item_formatted)
+            self._log.info('Skipping already processed track: {0.artist} - {0.title}', item)
             return
 
         # Get the MusicBrainz recording info.
-        recording_date = self._get_oldest_release_date(item.mb_trackid)
+        oldest_date = self._get_oldest_release_date(item.mb_trackid)
 
-        if not recording_date:
-            self._log.info('Recording ID not found: {0} for track {0}',
-                           item.mb_trackid,
-                           item_formatted)
+        if not oldest_date:
+            self._log.info('Data not found for {0.artist} - {0.title}', item)
             return
 
-        # Apply.
         write = False
         for recording_field in ('year', 'month', 'day'):
-            if recording_field in recording_date.keys():
-                item['recording_' + recording_field] = recording_date[recording_field]
+            if recording_field in oldest_date.keys():
+                item['recording_' + recording_field] = oldest_date[recording_field]
 
                 # Write over the year tag if configured
                 if self.config['write_over'] and recording_field == 'year':
-                    item[recording_field] = recording_date[recording_field]
-                    self._log.warning('Overwriting year field for: {0} from {1} to {2}', item_formatted,
-                                      item.recording_year, recording_date[recording_field])
+                    item[recording_field] = oldest_date[recording_field]
+                    self._log.warning('Overwriting year field for: {0.artist} - {0.title} from {1} to {2}', item,
+                                      item.recording_year, oldest_date[recording_field])
                 write = True
         if write:
-            self._log.info('Applying changes to {0}', item_formatted)
+            self._log.info('Applying changes to {0.artist} - {0.title}', item)
             item.write()
             item.store()
             if not self.importing:
                 item.write()
         else:
-            self._log.info('Error: {0}', recording_date)
+            self._log.info('Error: {0}', oldest_date)
 
     def _get_oldest_release_date(self, recording_id):
 
@@ -140,6 +135,11 @@ class RecordingDatePlugin(BeetsPlugin):
         releases = list()
         releases.append(recording['release-list'])
 
+        if 'work-relation-list' not in recording:
+            self._log.error('Recording {0} has no associated works! Please choose another recording or amend the data!',
+                            recording_id)
+            return None
+
         # TODO don't just take first work
         work_id = recording['work-relation-list'][0]['work']['id']
         work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
@@ -147,28 +147,31 @@ class RecordingDatePlugin(BeetsPlugin):
         today_date = datetime.date.today()
         oldest_date = today_date
 
-        for rec in work['recording-relation-list']:
-            if 'begin' in rec:
-                date = rec['begin']
-                if date:
-                    date = parser.isoparse(date).date()
-                    if date < oldest_date:
-                        oldest_date = date
+        approach = self.config['approach'].get()
 
-        if oldest_date == today_date:
-            if self.config['search_releases']:  # Go through releases for each recording
-                for rec in work['recording-relation-list']:
-                    rec_id = rec['recording']['id']
-                    fetched_recording = musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
-                        'recording']
+        if approach in ('recordings', 'hybrid', 'both'):
+            for rec in work['recording-relation-list']:
+                if 'begin' in rec:
+                    date = rec['begin']
+                    if date:
+                        date = parser.isoparse(date).date()
+                        if date < oldest_date:
+                            oldest_date = date
 
-                    for release in fetched_recording['release-list']:
+        if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
+            for rec in work['recording-relation-list']:
+                rec_id = rec['recording']['id']
+                fetched_recording = musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
+                    'recording']
+
+                for release in fetched_recording['release-list']:
+                    if 'date' in release:
                         release_date = release['date']
                         if release_date:
                             date = parser.isoparse(release_date).date()
                             if date < oldest_date:
                                 oldest_date = date
 
-        return {'year': None, 'month': None, 'day': None} if oldest_date == today_date else {'year': oldest_date.year,
-                                                                                             'month': oldest_date.month,
-                                                                                             'day': oldest_date.day}
+        return None if oldest_date == today_date else {'year': oldest_date.year,
+                                                       'month': oldest_date.month,
+                                                       'day': oldest_date.day}
