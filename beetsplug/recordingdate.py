@@ -9,9 +9,9 @@ from beets.plugins import BeetsPlugin
 from dateutil import parser
 
 musicbrainzngs.set_useragent(
-    "Beets recording date plugin",
-    "0.2",
-    "http://github.com/tweitzel"
+    "Beets oldest date plugin",
+    "0.1",
+    "https://github.com/kernitus/beets-recordingdate"
 )
 
 
