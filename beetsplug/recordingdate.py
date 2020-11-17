@@ -15,15 +15,6 @@ musicbrainzngs.set_useragent(
 )
 
 
-def _get_dict(dictionary, *attributes):
-    try:
-        for key in attributes:
-            dictionary = dictionary[key]
-        return dictionary
-    except(TypeError, KeyError):
-        return None
-
-
 def _make_date_values(date_str):
     date_parts = date_str.split('-')
     date_values = {'year': 0, 'month': 0, 'day': 0}
@@ -132,9 +123,6 @@ class RecordingDatePlugin(BeetsPlugin):
         # Fetch recording from recording_id
         recording = musicbrainzngs.get_recording_by_id(recording_id, ['releases', 'work-rels'])['recording']
 
-        releases = list()
-        releases.append(recording['release-list'])
-
         if 'work-relation-list' not in recording:
             self._log.error('Recording {0} has no associated works! Please choose another recording or amend the data!',
                             recording_id)
@@ -161,8 +149,11 @@ class RecordingDatePlugin(BeetsPlugin):
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
             for rec in work['recording-relation-list']:
                 rec_id = rec['recording']['id']
-                fetched_recording = musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
-                    'recording']
+
+                # Avoid extra API call for already fetched recording
+                fetched_recording = recording if rec_id == recording_id else \
+                    musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
+                        'recording']
 
                 for release in fetched_recording['release-list']:
                     if 'date' in release:
