@@ -136,7 +136,6 @@ class RecordingDatePlugin(BeetsPlugin):
 
         # Fetch recording from recording_id
         recording = musicbrainzngs.get_recording_by_id(recording_id, ['releases', 'work-rels'])['recording']
-        self._log.debug('Recording fetched: {0}', recording)
 
         releases = list()
         releases.append(recording['release-list'])
@@ -150,7 +149,6 @@ class RecordingDatePlugin(BeetsPlugin):
 
         for rec in work['recording-relation-list']:
             if 'begin' in rec:
-                self._log.debug('Rec begin date: {0}', rec['begin'])
                 date = rec['begin']
                 if date:
                     date = parser.isoparse(date).date()
