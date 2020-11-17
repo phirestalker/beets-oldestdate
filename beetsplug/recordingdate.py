@@ -135,7 +135,15 @@ class RecordingDatePlugin(BeetsPlugin):
 
         # Looks through release dates for each recording found
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
+            self._log.warning('Looking through {0} recordings for {1}', len(work['recording-relation-list']),
+                              recording['title'])
             for rec in work['recording-relation-list']:
+
+                # Filter the recordings list, sometimes it can be very long. This skips covers, lives etc.
+                if 'attribute-list' in rec:
+                    continue
+
+                self._log.debug('Recording: {0}', rec)
                 rec_id = rec['recording']['id']
 
                 # Avoid extra API call for already fetched recording
