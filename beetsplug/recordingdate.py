@@ -24,7 +24,7 @@ class RecordingDatePlugin(BeetsPlugin):
         self.config.add({
             'auto': True,  # Run during import phase
             'force': False,  # Run even if already processed
-            'write_over': False,  # Overwrite year field in tags
+            'overwrite_year': False,  # Overwrite year field in tags
             'approach': 'hybrid',  # recordings, releases, hybrid, both
             'filter_recordings': True  # Skip recordings with attributes before fetching them
         })
@@ -91,7 +91,7 @@ class RecordingDatePlugin(BeetsPlugin):
                 item['recording_' + recording_field] = oldest_date[recording_field]
 
                 # Write over the year tag if configured
-                if self.config['write_over'] and recording_field == 'year':
+                if self.config['overwrite_year'] and recording_field == 'year':
                     item[recording_field] = oldest_date[recording_field]
                     self._log.warning('Overwriting year field for: {0.artist} - {0.title} from {1} to {2}', item,
                                       item.recording_year, oldest_date[recording_field])
