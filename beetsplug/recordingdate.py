@@ -25,8 +25,8 @@ class RecordingDatePlugin(BeetsPlugin):
             'auto': True,  # Run during import phase
             'force': False,  # Run even if already processed
             'overwrite_year': False,  # Overwrite year field in tags
-            'approach': 'hybrid',  # recordings, releases, hybrid, both
-            'filter_recordings': True  # Skip recordings with attributes before fetching them
+            'filter_recordings': True,  # Skip recordings with attributes before fetching them
+            'approach': 'hybrid'  # recordings, releases, hybrid, both
         })
 
         # Get global MusicBrainz host setting
