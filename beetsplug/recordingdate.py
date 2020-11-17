@@ -22,10 +22,11 @@ class RecordingDatePlugin(BeetsPlugin):
         super(RecordingDatePlugin, self).__init__()
         self.import_stages = [self.on_import]
         self.config.add({
-            'auto': True,
-            'force': False,
-            'write_over': False,
-            'approach': 'hybrid'  # recordings, releases, hybrid, both
+            'auto': True,  # Run during import phase
+            'force': False,  # Run even if already processed
+            'write_over': False,  # Overwrite year field in tags
+            'approach': 'hybrid',  # recordings, releases, hybrid, both
+            'filter_recordings': True  # Skip recordings with attributes before fetching them
         })
 
         # Get global MusicBrainz host setting
@@ -135,15 +136,12 @@ class RecordingDatePlugin(BeetsPlugin):
 
         # Looks through release dates for each recording found
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
-            self._log.warning('Looking through {0} recordings for {1}', len(work['recording-relation-list']),
-                              recording['title'])
             for rec in work['recording-relation-list']:
 
                 # Filter the recordings list, sometimes it can be very long. This skips covers, lives etc.
-                if 'attribute-list' in rec:
+                if self.config['filter_recordings'] and 'attribute-list' in rec:
                     continue
 
-                self._log.debug('Recording: {0}', rec)
                 rec_id = rec['recording']['id']
 
                 # Avoid extra API call for already fetched recording
