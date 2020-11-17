@@ -48,6 +48,7 @@ class RecordingDatePlugin(BeetsPlugin):
             'auto': True,
             'force': False,
             'write_over': False,
+            'search_releases': False
         })
 
         # Get global MusicBrainz host setting
@@ -102,7 +103,7 @@ class RecordingDatePlugin(BeetsPlugin):
             return
 
         # Get the MusicBrainz recording info.
-        recording_date = self._get_oldest_release_date(item.mb_trackid, item.mb_artistid)
+        recording_date = self._get_oldest_release_date(item.mb_trackid)
 
         if not recording_date:
             self._log.info('Recording ID not found: {0} for track {0}',
@@ -131,7 +132,7 @@ class RecordingDatePlugin(BeetsPlugin):
         else:
             self._log.info('Error: {0}', recording_date)
 
-    def _get_oldest_release_date(self, recording_id, artist_id):
+    def _get_oldest_release_date(self, recording_id):
 
         # Fetch recording from recording_id
         recording = musicbrainzngs.get_recording_by_id(recording_id, ['releases', 'work-rels'])['recording']
@@ -144,7 +145,8 @@ class RecordingDatePlugin(BeetsPlugin):
         work_id = recording['work-relation-list'][0]['work']['id']
         work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
 
-        oldest_release_date = datetime.date.today()
+        today_date = datetime.date.today()
+        oldest_date = today_date
 
         for rec in work['recording-relation-list']:
             if 'begin' in rec:
@@ -152,15 +154,23 @@ class RecordingDatePlugin(BeetsPlugin):
                 date = rec['begin']
                 if date:
                     date = parser.isoparse(date).date()
-                    if date < oldest_release_date:
-                        oldest_release_date = date
+                    if date < oldest_date:
+                        oldest_date = date
 
-        oldest_release = {'year': oldest_release_date.year, 'month': oldest_release_date.month,
-                          'day': oldest_release_date.day}
+        if oldest_date == today_date:
+            if self.config['search_releases']:  # Go through releases for each recording
+                for rec in work['recording-relation-list']:
+                    rec_id = rec['recording']['id']
+                    fetched_recording = musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
+                        'recording']
 
-        # TODO if no recording had a date, we might want to go through the releases for each recording
+                    for release in fetched_recording['release-list']:
+                        release_date = release['date']
+                        if release_date:
+                            date = parser.isoparse(release_date).date()
+                            if date < oldest_date:
+                                oldest_date = date
 
-        if oldest_release_date == datetime.date.today():
-            self._log.error('Could not find date information for {0} - {1}', artist_id, recording_id)
-            oldest_release = {'year': None, 'month': None, 'day': None}
-        return oldest_release
+        return {'year': None, 'month': None, 'day': None} if oldest_date == today_date else {'year': oldest_date.year,
+                                                                                             'month': oldest_date.month,
+                                                                                             'day': oldest_date.day}
