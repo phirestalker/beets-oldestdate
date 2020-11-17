@@ -1,4 +1,3 @@
-# -- coding: utf-8 --
 from __future__ import division, absolute_import, print_function
 
 import datetime
@@ -9,17 +8,17 @@ from beets.plugins import BeetsPlugin
 from dateutil import parser
 
 musicbrainzngs.set_useragent(
-    "Beets oldest date plugin",
+    "Beets oldestdate plugin",
     "0.1",
-    "https://github.com/kernitus/beets-recordingdate"
+    "https://github.com/kernitus/beets-oldestdate"
 )
 
 
-class RecordingDatePlugin(BeetsPlugin):
+class OldestDatePlugin(BeetsPlugin):
     importing = False
 
     def __init__(self):
-        super(RecordingDatePlugin, self).__init__()
+        super(OldestDatePlugin, self).__init__()
         self.import_stages = [self.on_import]
         self.config.add({
             'auto': True,  # Run during import phase

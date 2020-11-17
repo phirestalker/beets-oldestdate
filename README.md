@@ -1,5 +1,5 @@
-# beets-oldest-date
-Beets plugin that fetches oldest recording or release date for each track. Originally based on beets-recordingdate by tweitzel.
+# beets-oldestdate
+Beets plugin that fetches oldest recording or release date for each track. Originally based on `beets-recordingdate` by tweitzel.
 
 # Installation
 Clone repo and run `python setup.py install`
@@ -18,8 +18,9 @@ Clone repo and run `python setup.py install`
               both: Go through both recordings and releases.
               
 ## Default Configuration
-    auto: True
-    force: False
-    overwrite_year: False
-    filter_recordings: True
-    approach: hybrid
+    oldestdate:
+        auto: True
+        force: False
+        overwrite_year: False
+        filter_recordings: True
+        approach: hybrid
