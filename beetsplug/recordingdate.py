@@ -15,20 +15,6 @@ musicbrainzngs.set_useragent(
 )
 
 
-def _make_date_values(date_str):
-    date_parts = date_str.split('-')
-    date_values = {'year': 0, 'month': 0, 'day': 0}
-    for key in ('year', 'month', 'day'):
-        if date_parts:
-            date_part = date_parts.pop(0)
-            try:
-                date_num = int(date_part)
-            except ValueError:
-                continue
-            date_values[key] = date_num
-    return date_values
-
-
 class RecordingDatePlugin(BeetsPlugin):
     importing = False
 
@@ -60,9 +46,9 @@ class RecordingDatePlugin(BeetsPlugin):
 
     def commands(self):
         recording_date_command = ui.Subcommand(
-            'recordingdate',
-            help="Retrieve the date of the first known release of a track.",
-            aliases=['rdate'])
+            'oldestdate',
+            help="Retrieve the date of the oldest known recording or release of a track.",
+            aliases=['olddate'])
         recording_date_command.func = self.func
         return [recording_date_command]
 
@@ -91,11 +77,11 @@ class RecordingDatePlugin(BeetsPlugin):
             self._log.info('Skipping already processed track: {0.artist} - {0.title}', item)
             return
 
-        # Get the MusicBrainz recording info.
+        # Get oldest date from MusicBrainz
         oldest_date = self._get_oldest_release_date(item.mb_trackid)
 
         if not oldest_date:
-            self._log.info('Data not found for {0.artist} - {0.title}', item)
+            self._log.info('No data not found for {0.artist} - {0.title}', item)
             return
 
         write = False
@@ -137,6 +123,7 @@ class RecordingDatePlugin(BeetsPlugin):
 
         approach = self.config['approach'].get()
 
+        # Look through recording dates
         if approach in ('recordings', 'hybrid', 'both'):
             for rec in work['recording-relation-list']:
                 if 'begin' in rec:
@@ -146,6 +133,7 @@ class RecordingDatePlugin(BeetsPlugin):
                         if date < oldest_date:
                             oldest_date = date
 
+        # Looks through release dates for each recording found
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
             for rec in work['recording-relation-list']:
                 rec_id = rec['recording']['id']
