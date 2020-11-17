@@ -16,3 +16,10 @@ Clone repo and run `python setup.py install`
                         Many API requests but a lot more accurate.
               hybrid: Go through releases only if no recordings have a date.
               both: Go through both recordings and releases.
+              
+## Default Configuration
+    auto: True
+    force: False
+    overwrite_year: False
+    filter_recordings: True
+    approach: hybrid
