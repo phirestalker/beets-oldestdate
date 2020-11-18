@@ -81,7 +81,7 @@ class OldestDatePlugin(BeetsPlugin):
         oldest_date = self._get_oldest_release_date(item.mb_trackid)
 
         if not oldest_date:
-            self._log.info('No data not found for {0.artist} - {0.title}', item)
+            self._log.info('No date found for {0.artist} - {0.title}', item)
             return
 
         write = False
@@ -114,16 +114,37 @@ class OldestDatePlugin(BeetsPlugin):
                             recording_id)
             return None
 
-        # TODO don't just take first work
-        work_id = recording['work-relation-list'][0]['work']['id']
+        # Find the first valid work
+        work_id = None
+
+        for work_rel in recording['work-relation-list']:
+            if 'work' in work_rel:
+                current_work = work_rel['work']
+                if 'id' in current_work:
+                    work_id = current_work['id']
+                    break
+
+        if not work_id:
+            self._log.error(
+                'Recording {0} has no valid associated works! Please choose another recording or amend the data!',
+                recording_id)
+            return None
+
+        # Fetch work, including associated recordings
         work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
+
+        if 'recording-relation-list' not in work:
+            self._log.error(
+                'Work {0} has no valid associated recordings! Please choose another recording or amend the data!',
+                work_id)
+            return None
 
         today_date = datetime.date.today()
         oldest_date = today_date
 
         approach = self.config['approach'].get()
 
-        # Look through recording dates
+        # Look for oldest recording date
         if approach in ('recordings', 'hybrid', 'both'):
             for rec in work['recording-relation-list']:
                 if 'begin' in rec:
@@ -133,7 +154,7 @@ class OldestDatePlugin(BeetsPlugin):
                         if date < oldest_date:
                             oldest_date = date
 
-        # Looks through release dates for each recording found
+        # Looks for oldest release date for each recording found
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
             for rec in work['recording-relation-list']:
 
@@ -141,20 +162,24 @@ class OldestDatePlugin(BeetsPlugin):
                 if self.config['filter_recordings'] and 'attribute-list' in rec:
                     continue
 
-                rec_id = rec['recording']['id']
+                if 'recording' in rec:
+                    recording = rec['recording']
+                    if 'id' in recording:
+                        rec_id = recording['id']
 
-                # Avoid extra API call for already fetched recording
-                fetched_recording = recording if rec_id == recording_id else \
-                    musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
-                        'recording']
+                        # Avoid extra API call for already fetched recording
+                        fetched_recording = recording if rec_id == recording_id else \
+                            musicbrainzngs.get_recording_by_id(rec_id, ['releases'], ['official'])[
+                                'recording']
 
-                for release in fetched_recording['release-list']:
-                    if 'date' in release:
-                        release_date = release['date']
-                        if release_date:
-                            date = parser.isoparse(release_date).date()
-                            if date < oldest_date:
-                                oldest_date = date
+                        if 'release-list' in fetched_recording:
+                            for release in fetched_recording['release-list']:
+                                if 'date' in release:
+                                    release_date = release['date']
+                                    if release_date:
+                                        date = parser.isoparse(release_date).date()
+                                        if date < oldest_date:
+                                            oldest_date = date
 
         return None if oldest_date == today_date else {'year': oldest_date.year,
                                                        'month': oldest_date.month,
