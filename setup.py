@@ -1,7 +1,6 @@
 from setuptools import setup, find_packages
 setup(
-    name="beets-recordingdate",
-    version="0.3",
+    name="beets-oldestdate",
+    version="1.0.0",
     packages=find_packages(),
 )
-
