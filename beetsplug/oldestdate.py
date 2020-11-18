@@ -29,7 +29,6 @@ class OldestDatePlugin(BeetsPlugin):
         })
 
         # Get global MusicBrainz host setting
-        # TODO fallback values for musicbrainz settings
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
         musicbrainzngs.set_rate_limit(1, config['musicbrainz']['ratelimit'].get())
         for recording_field in (
