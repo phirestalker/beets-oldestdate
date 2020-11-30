@@ -41,6 +41,7 @@ class OldestDatePlugin(BeetsPlugin):
         self.import_stages = [self._on_import]
         self.config.add({
             'auto': True,  # Run during import phase
+            'filter_on_import': False,  # During import, ignore candidates with no work_id
             'ignore_track_id': False,  # During import, ignore existing track_id
             'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
             'open_search_link': False,  # If chosen to add work, open relevant recordings search in browser
@@ -55,6 +56,9 @@ class OldestDatePlugin(BeetsPlugin):
             self.register_listener('import_task_created', self._import_task_created)
         if self.config['prompt_missing_work_id']:
             self.register_listener('import_task_choice', self._import_task_choice)
+        if self.config['filter_on_import']:
+            self.register_listener('trackinfo_received', self._import_trackinfo)
+            self.register_listener('before_choose_candidate', self._import_before_choose_candidate)
 
         # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
@@ -78,6 +82,15 @@ class OldestDatePlugin(BeetsPlugin):
             aliases=['olddate'])
         recording_date_command.func = self._command_func
         return [recording_date_command]
+
+    # Fetch the recording associated with each candidate
+    def _import_trackinfo(self, info):
+        if 'track_id' in info:
+            self._fetch_recording(info.track_id)
+
+    # Remove candidates that do not have a work id
+    def _import_before_choose_candidate(self, task, session):
+        task.candidates[:] = [can for can in task.candidates if self._has_work_id(can.info.track_id)]
 
     def _import_task_created(self, task, session):
         task.item.mb_trackid = None
