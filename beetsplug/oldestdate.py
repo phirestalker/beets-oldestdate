@@ -1,10 +1,12 @@
 from __future__ import division, absolute_import, print_function
 
 import datetime
+import webbrowser
 
 import mediafile
 import musicbrainzngs
 from beets import ui, config
+from beets.importer import action
 from beets.plugins import BeetsPlugin
 from dateutil import parser
 
@@ -39,18 +41,20 @@ class OldestDatePlugin(BeetsPlugin):
         self.import_stages = [self._on_import]
         self.config.add({
             'auto': True,  # Run during import phase
-            'filter_on_import': False,  # During import, ignore existing track_id and remove candidates with no work_id
+            'ignore_track_id': False,  # During import, ignore existing track_id
+            'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
+            'open_search_link': False,  # If chosen to add work, open relevant recordings search in browser
             'force': False,  # Run even if already processed
             'overwrite_year': False,  # Overwrite year field in tags
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
-            'approach': 'hybrid',  # recordings, releases, hybrid, both
+            'approach': 'releases',  # recordings, releases, hybrid, both
             'release_types': ['Official']  # Filter by release type
         })
 
-        if self.config['filter_on_import']:
-            self.register_listener('trackinfo_received', self._import_trackinfo)
-            self.register_listener('before_choose_candidate', self._before_choice)
+        if self.config['ignore_track_id']:
             self.register_listener('import_task_created', self._import_task_created)
+        if self.config['prompt_missing_work_id']:
+            self.register_listener('import_task_choice', self._import_task_choice)
 
         # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
@@ -75,18 +79,38 @@ class OldestDatePlugin(BeetsPlugin):
         recording_date_command.func = self._command_func
         return [recording_date_command]
 
-    def _import_trackinfo(self, info):
-        # Fetch the recording associated with each candidate
-        if 'track_id' in info:
-            self._fetch_recording(info.track_id)
-
     def _import_task_created(self, task, session):
-        self._log.debug("TASKA: {0}", task.item.mb_trackid)
         task.item.mb_trackid = None
 
-    def _before_choice(self, task, session):
-        # Remove candidates that do not have a work id
-        task.candidates[:] = [can for can in task.candidates if self._has_work_id(can.info.track_id)]
+    def _import_task_choice(self, task, session):
+        match = task.match.info
+        recording_id = match.track_id
+
+        if not self._has_work_id(recording_id):
+            self._log.error("{0.artist} - {0.title} has no associated work!", match)
+            sel = ui.input_options(('Fix data', 'Skip track'))
+            if sel == "f":
+                search_link = "https://musicbrainz.org/search?query=" + match.title.replace(' ', '+') \
+                              + "+artist%3A%22" + match.artist.replace(' ', '+') \
+                              + "%22&type=recording&limit=100&method=advanced"
+
+                if self.config['open_search_link']:
+                    webbrowser.open(search_link)
+                else:
+                    print("Search link: " + search_link)
+            else:
+                task.choice_flag = action.SKIP
+                return
+
+        while not self._has_work_id(recording_id):
+            self._log.error("{0.artist} - {0.title} has no associated work!", match)
+            print("Please add the associated works and try again!")
+            sel = ui.input_options(('Try again', 'Skip track'))
+            if sel == "t":  # Fetch data again
+                self._fetch_recording(recording_id)
+            else:
+                task.choice_flag = action.SKIP
+                return
 
     # Return whether the recording has a work id
     def _has_work_id(self, recording_id):
@@ -94,7 +118,7 @@ class OldestDatePlugin(BeetsPlugin):
         work_id = _get_work_id_from_recording(recording)
         return work_id is not None
 
-    # This queries the actual database, not the files.
+    # This queries the local database, not the files.
     def _command_func(self, lib, _, args):
         for item in lib.items(args):
             self._process_file(item)
