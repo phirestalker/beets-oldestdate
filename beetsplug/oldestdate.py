@@ -42,8 +42,8 @@ class OldestDatePlugin(BeetsPlugin):
         self.import_stages = [self._on_import]
         self.config.add({
             'auto': True,  # Run during import phase
-            'filter_on_import': False,  # During import, weight down candidates with no work_id
             'ignore_track_id': False,  # During import, ignore existing track_id
+            'filter_on_import': True,  # During import, weight down candidates with no work_id
             'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
             'open_search_link': False,  # If chosen to add work, open relevant recordings search in browser
             'force': False,  # Run even if already processed
