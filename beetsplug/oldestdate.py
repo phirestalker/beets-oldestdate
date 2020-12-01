@@ -13,7 +13,7 @@ from dateutil import parser
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.0.0",
+    "1.1.0",
     "https://github.com/kernitus/beets-oldestdate"
 )
 
