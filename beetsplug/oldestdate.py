@@ -6,6 +6,7 @@ import webbrowser
 import mediafile
 import musicbrainzngs
 from beets import ui, config
+from beets.autotag import hooks
 from beets.importer import action
 from beets.plugins import BeetsPlugin
 from dateutil import parser
@@ -41,7 +42,7 @@ class OldestDatePlugin(BeetsPlugin):
         self.import_stages = [self._on_import]
         self.config.add({
             'auto': True,  # Run during import phase
-            'filter_on_import': False,  # During import, ignore candidates with no work_id
+            'filter_on_import': False,  # During import, weight down candidates with no work_id
             'ignore_track_id': False,  # During import, ignore existing track_id
             'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
             'open_search_link': False,  # If chosen to add work, open relevant recordings search in browser
@@ -49,8 +50,11 @@ class OldestDatePlugin(BeetsPlugin):
             'overwrite_year': False,  # Overwrite year field in tags
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
-            'release_types': ['Official']  # Filter by release type
+            'release_types': None  # Filter by release type, e.g. ['Official']
         })
+
+        # Add heavy weight for missing work_id from a track
+        config['match']['distance_weights'].add({'work_id': 4})
 
         if self.config['ignore_track_id']:
             self.register_listener('import_task_created', self._import_task_created)
@@ -58,7 +62,6 @@ class OldestDatePlugin(BeetsPlugin):
             self.register_listener('import_task_choice', self._import_task_choice)
         if self.config['filter_on_import']:
             self.register_listener('trackinfo_received', self._import_trackinfo)
-            self.register_listener('before_choose_candidate', self._import_before_choose_candidate)
 
         # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
@@ -88,9 +91,12 @@ class OldestDatePlugin(BeetsPlugin):
         if 'track_id' in info:
             self._fetch_recording(info.track_id)
 
-    # Remove candidates that do not have a work id
-    def _import_before_choose_candidate(self, task, session):
-        task.candidates[:] = [can for can in task.candidates if self._has_work_id(can.info.track_id)]
+    def track_distance(self, item, info):
+        dist = hooks.Distance()
+        if self.config['filter_on_import'] and not self._has_work_id(info.track_id):
+            dist.add('work_id', 1)
+
+        return dist
 
     def _import_task_created(self, task, session):
         task.item.mb_trackid = None
@@ -155,8 +161,6 @@ class OldestDatePlugin(BeetsPlugin):
 
         # Get oldest date from MusicBrainz
         oldest_date = self._get_oldest_release_date(item.mb_trackid)
-
-        self._log.debug('Getting oldest date')
 
         if not oldest_date:
             self._log.error('No date found for {0.artist} - {0.title}', item)
