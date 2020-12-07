@@ -45,7 +45,6 @@ class OldestDatePlugin(BeetsPlugin):
             'ignore_track_id': False,  # During import, ignore existing track_id
             'filter_on_import': True,  # During import, weight down candidates with no work_id
             'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
-            'open_search_link': False,  # If chosen to add work, open relevant recordings search in browser
             'force': False,  # Run even if already processed
             'overwrite_year': False,  # Overwrite year field in tags
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
@@ -108,31 +107,20 @@ class OldestDatePlugin(BeetsPlugin):
         match = match.info
 
         recording_id = match.track_id
-
-        if not self._has_work_id(recording_id):
-            self._log.error("{0.artist} - {0.title} ({1}) has no associated work!", match, task.item.year)
-            sel = ui.input_options(('Fix data', 'No date check', 'Skip track'))
-            if sel == "f":
-                search_link = "https://musicbrainz.org/search?query=" + match.title.replace(' ', '+') \
-                              + "+artist%3A%22" + match.artist.replace(' ', '+') \
-                              + "%22&type=recording&limit=100&method=advanced"
-
-                if self.config['open_search_link']:
-                    webbrowser.open(search_link)
-                else:
-                    print("Search link: " + search_link)
-            elif sel == "n":
-                return
-            else:
-                task.choice_flag = action.SKIP
-                return
+        search_link = "https://musicbrainz.org/search?query=" + match.title.replace(' ', '+') \
+                      + "+artist%3A%22" + match.artist.replace(' ', '+') \
+                      + "%22&type=recording&limit=100&method=advanced"
 
         while not self._has_work_id(recording_id):
-            self._log.error("{0.artist} - {0.title} has no associated work!", match)
-            print("Please add the associated works and try again!")
-            sel = ui.input_options(('Try again', 'Skip track'))
+            self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix and try again!", match,
+                            task.item.year)
+            print("Search link: " + search_link)
+            sel = ui.input_options(('Try again', 'No date check', 'Skip track'))
+
             if sel == "t":  # Fetch data again
                 self._fetch_recording(recording_id)
+            elif sel == "n":
+                return
             else:
                 task.choice_flag = action.SKIP
                 return
