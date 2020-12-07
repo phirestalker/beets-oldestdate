@@ -102,7 +102,11 @@ class OldestDatePlugin(BeetsPlugin):
         task.item.mb_trackid = None
 
     def _import_task_choice(self, task, session):
-        match = task.match.info
+        match = task.match
+        if not match:
+            return
+        match = match.info
+
         recording_id = match.track_id
 
         if not self._has_work_id(recording_id):
