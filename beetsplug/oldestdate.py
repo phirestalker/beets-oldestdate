@@ -167,9 +167,9 @@ class OldestDatePlugin(BeetsPlugin):
 
                 # Write over the year tag if configured
                 if self.config['overwrite_year'] and recording_field == 'year':
-                    item[recording_field] = oldest_date[recording_field]
                     self._log.warning('Overwriting year field for: {0.artist} - {0.title} from {1} to {2}', item,
-                                      item.recording_year, oldest_date[recording_field])
+                                      item[recording_field], oldest_date[recording_field])
+                    item[recording_field] = oldest_date[recording_field]
                 write = True
         if write:
             self._log.info('Applying changes to {0.artist} - {0.title}', item)
