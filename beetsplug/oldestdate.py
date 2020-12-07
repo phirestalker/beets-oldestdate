@@ -110,7 +110,7 @@ class OldestDatePlugin(BeetsPlugin):
         recording_id = match.track_id
 
         if not self._has_work_id(recording_id):
-            self._log.error("{0.artist} - {0.title} has no associated work!", match)
+            self._log.error("{0.artist} - {0.title} ({1}) has no associated work!", match, task.item.year)
             sel = ui.input_options(('Fix data', 'No date check', 'Skip track'))
             if sel == "f":
                 search_link = "https://musicbrainz.org/search?query=" + match.title.replace(' ', '+') \
