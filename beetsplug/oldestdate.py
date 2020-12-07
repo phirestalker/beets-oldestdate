@@ -107,7 +107,7 @@ class OldestDatePlugin(BeetsPlugin):
 
         if not self._has_work_id(recording_id):
             self._log.error("{0.artist} - {0.title} has no associated work!", match)
-            sel = ui.input_options(('Fix data', 'Skip track'))
+            sel = ui.input_options(('Fix data', 'No date check', 'Skip track'))
             if sel == "f":
                 search_link = "https://musicbrainz.org/search?query=" + match.title.replace(' ', '+') \
                               + "+artist%3A%22" + match.artist.replace(' ', '+') \
@@ -117,6 +117,8 @@ class OldestDatePlugin(BeetsPlugin):
                     webbrowser.open(search_link)
                 else:
                     print("Search link: " + search_link)
+            elif sel == "n":
+                return
             else:
                 task.choice_flag = action.SKIP
                 return
@@ -201,6 +203,9 @@ class OldestDatePlugin(BeetsPlugin):
         release_types = self.config['release_types'].get()
         recording = self._get_recording(recording_id)
         work_id = _get_work_id_from_recording(recording)
+
+        if not work_id:
+            return None
 
         # Fetch work, including associated recordings
         work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
