@@ -246,9 +246,12 @@ class OldestDatePlugin(BeetsPlugin):
                             if 'date' in release:
                                 release_date = release['date']
                                 if release_date:
-                                    date = parser.isoparse(release_date).date()
-                                    if date < oldest_date:
-                                        oldest_date = date
+                                    try:
+                                        date = parser.isoparse(release_date).date()
+                                        if date < oldest_date:
+                                            oldest_date = date
+                                    except ValueError:
+                                        self._log.error("Could not parse date {0}!", release_date)
 
                 self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
 
