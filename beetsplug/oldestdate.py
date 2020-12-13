@@ -115,11 +115,11 @@ class OldestDatePlugin(BeetsPlugin):
             self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix and try again!", match,
                             task.item.year)
             print("Search link: " + search_link)
-            sel = ui.input_options(('Try again', 'No date check', 'Skip track'))
+            sel = ui.input_options(('Use this recording', 'Try again', 'Skip track'))
 
             if sel == "t":  # Fetch data again
                 self._fetch_recording(recording_id)
-            elif sel == "n":
+            elif sel == "u":
                 return
             else:
                 task.choice_flag = action.SKIP
@@ -154,7 +154,7 @@ class OldestDatePlugin(BeetsPlugin):
             return
 
         # Get oldest date from MusicBrainz
-        oldest_date = self._get_oldest_release_date(item.mb_trackid)
+        oldest_date = self._get_oldest_date(item.mb_trackid)
 
         if not oldest_date:
             self._log.error('No date found for {0.artist} - {0.title}', item)
@@ -191,48 +191,38 @@ class OldestDatePlugin(BeetsPlugin):
         return self._recordings_cache[
             recording_id] if recording_id in self._recordings_cache else self._fetch_recording(recording_id)
 
-    def _get_oldest_release_date(self, recording_id):
+    # Iterates through a list of recordings and returns oldest date
+    def _iterate_dates(self, recordings):
         release_types = self.config['release_types'].get()
-        recording = self._get_recording(recording_id)
-        work_id = _get_work_id_from_recording(recording)
-
-        if not work_id:
-            return None
-
-        # Fetch work, including associated recordings
-        work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
-
-        if 'recording-relation-list' not in work:
-            self._log.error(
-                'Work {0} has no valid associated recordings! Please choose another recording or amend the data!',
-                work_id)
-            return None
-
-        today_date = datetime.date.today()
+        today_date = datetime.date.today()  # TODO might want to use file's date
         oldest_date = today_date
 
         approach = self.config['approach'].get()
 
         # Look for oldest recording date
         if approach in ('recordings', 'hybrid', 'both'):
-            for rec in work['recording-relation-list']:
+            for rec in recordings:
                 if 'begin' in rec:
                     date = rec['begin']
                     if date:
-                        date = parser.isoparse(date).date()
-                        if date < oldest_date:
-                            oldest_date = date
+                        try:
+                            date = parser.isoparse(date).date()
+                            if date < oldest_date:
+                                oldest_date = date
+                        except ValueError:
+                            self._log.error("Could not parse date {0} for recording {1}", date, rec)
+
                 # Remove recording from cache if no longer needed
                 if approach == 'recordings' or (approach == 'hybrid' and oldest_date != today_date):
                     self._recordings_cache.pop(rec['recording']['id'], None)  # Remove recording from cache
 
         # Looks for oldest release date for each recording found
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
-            for rec in work['recording-relation-list']:
-
+            for rec in recordings:
                 rec_id = rec['recording']['id']
 
                 # Filter the recordings list, sometimes it can be very long. This skips covers, lives etc.
+                # TODO maybe this song is a cover, and we don't want the original year but cover year
                 if self.config['filter_recordings'] and 'attribute-list' in rec:
                     self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
                     continue
@@ -251,10 +241,28 @@ class OldestDatePlugin(BeetsPlugin):
                                         if date < oldest_date:
                                             oldest_date = date
                                     except ValueError:
-                                        self._log.error("Could not parse date {0}!", release_date)
+                                        self._log.error("Could not parse date {0} for recording {1}", release_date, rec)
 
                 self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
 
         return None if oldest_date == today_date else {'year': oldest_date.year,
                                                        'month': oldest_date.month,
                                                        'day': oldest_date.day}
+
+    def _get_oldest_date(self, recording_id):
+        recording = self._get_recording(recording_id)
+        work_id = _get_work_id_from_recording(recording)
+
+        if not work_id:  # Only look through this recording
+            return self._iterate_dates([recording])
+
+        # Fetch work, including associated recordings
+        work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
+
+        if 'recording-relation-list' not in work:
+            self._log.error(
+                'Work {0} has no valid associated recordings! Please choose another recording or amend the data!',
+                work_id)
+            return None
+
+        return self._iterate_dates(work['recording-relation-list'])
