@@ -1,7 +1,6 @@
 from __future__ import division, absolute_import, print_function
 
 import datetime
-import webbrowser
 
 import mediafile
 import musicbrainzngs
@@ -44,16 +43,14 @@ class OldestDatePlugin(BeetsPlugin):
             'auto': True,  # Run during import phase
             'ignore_track_id': False,  # During import, ignore existing track_id
             'filter_on_import': True,  # During import, weight down candidates with no work_id
-            'prompt_missing_work_id': True,  # During import, prompt to add work_id if missing
+            'prompt_missing_work_id': True,  # During import, prompt to fix work_id if missing
             'force': False,  # Run even if already processed
             'overwrite_year': False,  # Overwrite year field in tags
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
-            'release_types': None  # Filter by release type, e.g. ['Official']
+            'release_types': None,  # Filter by release type, e.g. ['Official']
+            'use_file_date': False  # Also use file's date when looking for oldest date
         })
-
-        # Add heavy weight for missing work_id from a track
-        config['match']['distance_weights'].add({'work_id': 4})
 
         if self.config['ignore_track_id']:
             self.register_listener('import_task_created', self._import_task_created)
@@ -61,6 +58,8 @@ class OldestDatePlugin(BeetsPlugin):
             self.register_listener('import_task_choice', self._import_task_choice)
         if self.config['filter_on_import']:
             self.register_listener('trackinfo_received', self._import_trackinfo)
+            # Add heavy weight for missing work_id from a track
+            config['match']['distance_weights'].add({'work_id': 4})
 
         # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
@@ -154,7 +153,21 @@ class OldestDatePlugin(BeetsPlugin):
             return
 
         # Get oldest date from MusicBrainz
-        oldest_date = self._get_oldest_date(item.mb_trackid)
+        file_date = None
+        if self.config['use_file_date']:
+            try:
+                file_date = str(item.year) + str(item.month) + str(item.day)
+                file_date = parser.isoparse(file_date).date()
+            except (KeyError, ValueError):
+                try:
+                    file_date = str(item.year) + "0101"
+                    file_date = parser.isoparse(file_date).date()
+                except (KeyError, ValueError):
+                    self._log.info('Track {0} has no valid embedded date', item)
+        else:
+            file_date = None
+
+        oldest_date = self._get_oldest_date(item.mb_trackid, file_date)
 
         if not oldest_date:
             self._log.error('No date found for {0.artist} - {0.title}', item)
@@ -192,10 +205,10 @@ class OldestDatePlugin(BeetsPlugin):
             recording_id] if recording_id in self._recordings_cache else self._fetch_recording(recording_id)
 
     # Iterates through a list of recordings and returns oldest date
-    def _iterate_dates(self, recordings):
+    def _iterate_dates(self, recordings, item_date):
         release_types = self.config['release_types'].get()
-        today_date = datetime.date.today()  # TODO might want to use file's date
-        oldest_date = today_date
+        today_date = datetime.date.today()
+        oldest_date = item_date if item_date is not None else today_date
 
         approach = self.config['approach'].get()
 
@@ -249,12 +262,12 @@ class OldestDatePlugin(BeetsPlugin):
                                                        'month': oldest_date.month,
                                                        'day': oldest_date.day}
 
-    def _get_oldest_date(self, recording_id):
+    def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
         work_id = _get_work_id_from_recording(recording)
 
         if not work_id:  # Only look through this recording
-            return self._iterate_dates([recording])
+            return self._iterate_dates([recording], item_date)
 
         # Fetch work, including associated recordings
         work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
@@ -265,4 +278,4 @@ class OldestDatePlugin(BeetsPlugin):
                 work_id)
             return None
 
-        return self._iterate_dates(work['recording-relation-list'])
+        return self._iterate_dates(work['recording-relation-list'], item_date)
