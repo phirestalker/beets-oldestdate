@@ -49,7 +49,7 @@ class OldestDatePlugin(BeetsPlugin):
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
             'release_types': None,  # Filter by release type, e.g. ['Official']
-            'use_file_date': False  # Also use file's date when looking for oldest date
+            'use_file_date': False  # Also use file's embedded date when looking for oldest date
         })
 
         if self.config['ignore_track_id']:
@@ -154,18 +154,15 @@ class OldestDatePlugin(BeetsPlugin):
 
         # Get oldest date from MusicBrainz
         file_date = None
-        if self.config['use_file_date']:
+        try:
+            file_date = str(item.year) + str(item.month) + str(item.day)
+            file_date = parser.isoparse(file_date).date()
+        except (KeyError, ValueError):
             try:
-                file_date = str(item.year) + str(item.month) + str(item.day)
+                file_date = str(item.year) + "0101"
                 file_date = parser.isoparse(file_date).date()
             except (KeyError, ValueError):
-                try:
-                    file_date = str(item.year) + "0101"
-                    file_date = parser.isoparse(file_date).date()
-                except (KeyError, ValueError):
-                    self._log.info('Track {0} has no valid embedded date', item)
-        else:
-            file_date = None
+                self._log.info('Track {0} has no valid embedded date', item)
 
         oldest_date = self._get_oldest_date(item.mb_trackid, file_date)
 
@@ -208,7 +205,8 @@ class OldestDatePlugin(BeetsPlugin):
     def _iterate_dates(self, recordings, item_date):
         release_types = self.config['release_types'].get()
         today_date = datetime.date.today()
-        oldest_date = item_date if item_date is not None else today_date
+        oldest_date = item_date if item_date is not None and (
+                self.config['use_file_date'] or len(recordings) <= 1) else today_date
 
         approach = self.config['approach'].get()
 
@@ -233,6 +231,7 @@ class OldestDatePlugin(BeetsPlugin):
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == today_date):
             for rec in recordings:
                 rec_id = rec['recording']['id']
+                self._log.debug("REC: {0}", rec_id)
 
                 # Filter the recordings list, sometimes it can be very long. This skips covers, lives etc.
                 # TODO maybe this song is a cover, and we don't want the original year but cover year
