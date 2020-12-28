@@ -247,7 +247,12 @@ class OldestDatePlugin(BeetsPlugin):
         # Look for oldest recording date
         if approach in ('recordings', 'hybrid', 'both'):
             for rec in recordings:
-                rec_id = rec['recording']['id']
+                if 'recording' not in rec:
+                    continue
+                rec_id = rec['recording']
+                if 'id' not in rec_id:
+                    continue
+                rec_id = rec_id['id']
 
                 # If a cover, filter recordings to only keep covers. Otherwise remove covers
                 if is_cover != ('attribute-list' in rec and 'cover' in rec['attribute-list']):
@@ -272,7 +277,12 @@ class OldestDatePlugin(BeetsPlugin):
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             for rec in recordings:
-                rec_id = rec['recording']['id']
+                if 'recording' not in rec:
+                    continue
+                rec_id = rec['recording']
+                if 'id' not in rec_id:
+                    continue
+                rec_id = rec_id['id']
 
                 fetched_recording = None
 
