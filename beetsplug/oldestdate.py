@@ -244,29 +244,32 @@ class OldestDatePlugin(BeetsPlugin):
         approach = self.config['approach'].get()
         oldest_date = starting_date
 
-        self._log.debug("IS COVER? {0}", is_cover)
-
         # Look for oldest recording date
         if approach in ('recordings', 'hybrid', 'both'):
             for rec in recordings:
-                if is_cover and 'attribute-list' in rec and 'cover' in rec['attribute-list']:  # TODO author check
-                    if 'begin' in rec:
-                        date = rec['begin']
-                        if date:
-                            try:
-                                date = parser.isoparse(date).date()
-                                if date < oldest_date:
-                                    oldest_date = date
-                            except ValueError:
-                                self._log.error("Could not parse date {0} for recording {1}", date, rec)
+                rec_id = rec['recording']['id']
 
-                    # Remove recording from cache if no longer needed
-                    if approach == 'recordings' or (approach == 'hybrid' and oldest_date != starting_date):
-                        self._recordings_cache.pop(rec['recording']['id'], None)  # Remove recording from cache
-                else:
-                    self._recordings_cache.pop(rec['recording']['id'], None)  # Remove recording from cache
+                # If a cover, filter recordings to only keep covers. Otherwise remove covers
+                if is_cover != ('attribute-list' in rec and 'cover' in rec['attribute-list']):
+                    # We can't filter by author here without fetching each individual recording.
+                    self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+                    continue
 
-        # Looks for oldest release date for each recording found
+                if 'begin' in rec:
+                    date = rec['begin']
+                    if date:
+                        try:
+                            date = parser.isoparse(date).date()
+                            if date < oldest_date:
+                                oldest_date = date
+                        except ValueError:
+                            self._log.error("Could not parse date {0} for recording {1}", date, rec)
+
+                # Remove recording from cache if no longer needed
+                if approach == 'recordings' or (approach == 'hybrid' and oldest_date != starting_date):
+                    self._recordings_cache.pop(rec_id, None)
+
+        # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             for rec in recordings:
                 rec_id = rec['recording']['id']
@@ -291,8 +294,6 @@ class OldestDatePlugin(BeetsPlugin):
                 if not fetched_recording:
                     fetched_recording = self._get_recording(rec_id)
 
-                self._log.debug("Filtered REC: {0}", fetched_recording)
-
                 if 'release-list' in fetched_recording:
                     for release in fetched_recording['release-list']:
                         if release_types is None or (  # Filter by recording type, i.e. Official
@@ -315,7 +316,6 @@ class OldestDatePlugin(BeetsPlugin):
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
-        self._log.debug("CHOSEN {0}", recording)
         is_cover = _is_cover(recording)
         work_id = _get_work_id_from_recording(recording)
         artist_ids = _get_artist_ids_from_recording(recording)
