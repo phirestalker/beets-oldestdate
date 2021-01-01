@@ -68,6 +68,20 @@ def _is_cover(recording):
     return False
 
 
+def _date_from_file(year, month, day):
+    file_date = None
+    try:
+        file_date_str = str(year) + str(month) + str(day)
+        file_date = parser.isoparse(file_date_str).date()
+    except (KeyError, ValueError):
+        try:
+            file_date_str = str(year) + "0101"  # First of January
+            file_date = parser.isoparse(file_date_str).date()
+        except (KeyError, ValueError):
+            pass
+    return file_date
+
+
 class OldestDatePlugin(BeetsPlugin):
     _importing = False
     _recordings_cache = dict()
@@ -126,7 +140,7 @@ class OldestDatePlugin(BeetsPlugin):
         if 'track_id' in info:
             self._fetch_recording(info.track_id)
 
-    def track_distance(self, item, info):
+    def track_distance(self, session, info):
         dist = hooks.Distance()
         if self.config['filter_on_import'] and not self._has_work_id(info.track_id):
             dist.add('work_id', 1)
@@ -148,9 +162,13 @@ class OldestDatePlugin(BeetsPlugin):
                       + "%22&type=recording&limit=100&method=advanced"
 
         while not self._has_work_id(recording_id):
-            recording = self._get_recording(recording_id)
-            self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix and try again!", match,
-                            task.item.year)  # TODO show recording year, not file year
+            recording_year = self._get_oldest_date(recording_id,
+                                                   _date_from_file(task.item.year, task.item.month, task.item.day))
+            recording_year_string = None if recording_year is None else str(recording_year['year'])
+
+            self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix "
+                            "and try again!", match,
+                            recording_year_string)
             print("Search link: " + search_link)
             sel = ui.input_options(('Use this recording', 'Try again', 'Skip track'))
 
@@ -169,7 +187,7 @@ class OldestDatePlugin(BeetsPlugin):
         return work_id is not None
 
     # This queries the local database, not the files.
-    def _command_func(self, lib, _, args):
+    def _command_func(self, lib, session, args):
         for item in lib.items(args):
             self._process_file(item)
 
@@ -190,18 +208,7 @@ class OldestDatePlugin(BeetsPlugin):
             return
 
         # Get oldest date from MusicBrainz
-        file_date = None
-        try:
-            file_date_str = str(item.year) + str(item.month) + str(item.day)
-            file_date = parser.isoparse(file_date_str).date()
-        except (KeyError, ValueError):
-            try:
-                file_date_str = str(item.year) + "0101"  # First of January
-                file_date = parser.isoparse(file_date_str).date()
-            except (KeyError, ValueError):
-                self._log.warning('Track {0} has no valid embedded date', item)
-
-        oldest_date = self._get_oldest_date(item.mb_trackid, file_date)
+        oldest_date = self._get_oldest_date(item.mb_trackid, _date_from_file(item.year, item.month, item.day))
 
         if not oldest_date:
             self._log.error('No date found for {0.artist} - {0.title}', item)
@@ -320,9 +327,9 @@ class OldestDatePlugin(BeetsPlugin):
 
                 self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
 
-        return None if oldest_date == starting_date else {'year': oldest_date.year,
-                                                          'month': oldest_date.month,
-                                                          'day': oldest_date.day}
+        return None if oldest_date == datetime.date.today() else {'year': oldest_date.year,
+                                                                  'month': oldest_date.month,
+                                                                  'day': oldest_date.day}
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
