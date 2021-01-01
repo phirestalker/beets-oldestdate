@@ -148,8 +148,9 @@ class OldestDatePlugin(BeetsPlugin):
                       + "%22&type=recording&limit=100&method=advanced"
 
         while not self._has_work_id(recording_id):
+            recording = self._get_recording(recording_id)
             self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix and try again!", match,
-                            task.item.year)
+                            task.item.year)  # TODO show recording year, not file year
             print("Search link: " + search_link)
             sel = ui.input_options(('Use this recording', 'Try again', 'Skip track'))
 
@@ -191,14 +192,14 @@ class OldestDatePlugin(BeetsPlugin):
         # Get oldest date from MusicBrainz
         file_date = None
         try:
-            file_date = str(item.year) + str(item.month) + str(item.day)
-            file_date = parser.isoparse(file_date).date()
+            file_date_str = str(item.year) + str(item.month) + str(item.day)
+            file_date = parser.isoparse(file_date_str).date()
         except (KeyError, ValueError):
             try:
-                file_date = str(item.year) + "0101"  # First of January
-                file_date = parser.isoparse(file_date).date()
+                file_date_str = str(item.year) + "0101"  # First of January
+                file_date = parser.isoparse(file_date_str).date()
             except (KeyError, ValueError):
-                self._log.info('Track {0} has no valid embedded date', item)
+                self._log.warning('Track {0} has no valid embedded date', item)
 
         oldest_date = self._get_oldest_date(item.mb_trackid, file_date)
 
@@ -277,9 +278,8 @@ class OldestDatePlugin(BeetsPlugin):
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             for rec in recordings:
-                if 'recording' not in rec:
-                    continue
-                rec_id = rec['recording']
+                self._log.error("REC: {0}", rec)
+                rec_id = rec['recording'] if 'recording' in rec else rec
                 if 'id' not in rec_id:
                     continue
                 rec_id = rec_id['id']
