@@ -12,7 +12,7 @@ from dateutil import parser
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.1.0",
+    "1.1.1",
     "https://github.com/kernitus/beets-oldestdate"
 )
 
@@ -285,7 +285,6 @@ class OldestDatePlugin(BeetsPlugin):
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             for rec in recordings:
-                self._log.error("REC: {0}", rec)
                 rec_id = rec['recording'] if 'recording' in rec else rec
                 if 'id' not in rec_id:
                     continue
