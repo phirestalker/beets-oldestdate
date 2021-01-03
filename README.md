@@ -2,7 +2,7 @@
 Beets plugin that fetches oldest recording or release date for each track. This is especially useful when tracks are from best-of compilations, remasters, or re-releases. Originally based on `beets-recordingdate` by tweitzel, but almost entirely rewritten to actually work with MusicBrainz's incomplete information. The only thing left intact is the `recording_` MP3 tags, for compatibility with `beets-recordingdate`.
 
 # Installation
-Clone the repo and run `python setup.py install`, then add `oldestdate` to the list of active plugins in beets and configure as necessary.
+Clone the repo and run `python setup.py install`, then add `oldestdate` to the list of active plugins in beets and configure as necessary. The plugin is intended to be used in singleton mode. Undefined behaviour may occur otherwise.
 
 # Configuration
 
