@@ -228,7 +228,8 @@ class OldestDatePlugin(BeetsPlugin):
 
         if write:
             self._log.info('Applying changes to {0.artist} - {0.title}', item)
-            item.write()
+            # prevent changing file on disk before it reaches final destination
+            # item.write()
             item.store()
             if not self._importing:
                 item.write()
