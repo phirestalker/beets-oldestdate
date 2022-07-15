@@ -12,7 +12,7 @@ from dateutil import parser
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.1.1",
+    "1.1.2",
     "https://github.com/kernitus/beets-oldestdate"
 )
 
@@ -247,89 +247,104 @@ class OldestDatePlugin(BeetsPlugin):
         return self._recordings_cache[
             recording_id] if recording_id in self._recordings_cache else self._fetch_recording(recording_id)
 
+    # Get oldest date from a recording
+    def _extract_oldest_recording_date(self, recordings, starting_date, is_cover, approach):
+        oldest_date = starting_date
+
+        for rec in recordings:
+            if 'recording' not in rec:
+                continue
+            rec_id = rec['recording']
+            if 'id' not in rec_id:
+                continue
+            rec_id = rec_id['id']
+
+            # If a cover, filter recordings to only keep covers. Otherwise, remove covers
+            if is_cover != ('attribute-list' in rec and 'cover' in rec['attribute-list']):
+                # We can't filter by author here without fetching each individual recording.
+                self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+                continue
+
+            if 'begin' in rec:
+                date = rec['begin']
+                if date:
+                    try:
+                        date = parser.isoparse(date).date()
+                        if date < oldest_date:
+                            oldest_date = date
+                    except ValueError:
+                        self._log.error("Could not parse date {0} for recording {1}", date, rec)
+
+            # Remove recording from cache if no longer needed
+            if approach == 'recordings' or (approach == 'hybrid' and oldest_date != starting_date):
+                self._recordings_cache.pop(rec_id, None)
+
+        return oldest_date
+
+    # Get oldest date from a release
+    def _extract_oldest_release_date(self, recordings, starting_date, is_cover):
+        oldest_date = starting_date
+        release_types = self.config['release_types'].get()
+
+        for rec in recordings:
+            rec_id = rec['recording'] if 'recording' in rec else rec
+            if 'id' not in rec_id:
+                continue
+            rec_id = rec_id['id']
+
+            fetched_recording = None
+
+            # Shorten recordings list, but if song is a cover, only keep covers
+            if is_cover:
+                if 'attribute-list' not in rec or 'cover' not in rec['attribute-list']:
+                    self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+                    continue
+                else:
+                    # Filter by artist, but only if cover, to avoid a group splitting up into solos not matching
+                    fetched_recording = self._get_recording(rec_id)
+                    if not _contains_artist(fetched_recording, artist_ids):
+                        self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+                        continue
+            elif self.config['filter_recordings'] and 'attribute-list' in rec:  # If live, cover etc.
+                self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+                continue
+
+            if not fetched_recording:
+                fetched_recording = self._get_recording(rec_id)
+
+            if 'release-list' in fetched_recording:
+                for release in fetched_recording['release-list']:
+                    if release_types is None or (  # Filter by recording type, i.e. Official
+                            'status' in release and release['status'] in release_types):
+                        if 'date' in release:
+                            release_date = release['date']
+                            if release_date:
+                                try:
+                                    date = parser.isoparse(release_date).date()
+                                    if date < oldest_date:
+                                        oldest_date = date
+                                except ValueError:
+                                    self._log.error("Could not parse date {0} for recording {1}", release_date, rec)
+
+            self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
+
+        return oldest_date
+
     # Iterates through a list of recordings and returns oldest date
     def _iterate_dates(self, recordings, starting_date, is_cover, artist_ids):
-        release_types = self.config['release_types'].get()
         approach = self.config['approach'].get()
         oldest_date = starting_date
 
         # Look for oldest recording date
         if approach in ('recordings', 'hybrid', 'both'):
-            for rec in recordings:
-                if 'recording' not in rec:
-                    continue
-                rec_id = rec['recording']
-                if 'id' not in rec_id:
-                    continue
-                rec_id = rec_id['id']
-
-                # If a cover, filter recordings to only keep covers. Otherwise remove covers
-                if is_cover != ('attribute-list' in rec and 'cover' in rec['attribute-list']):
-                    # We can't filter by author here without fetching each individual recording.
-                    self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
-                    continue
-
-                if 'begin' in rec:
-                    date = rec['begin']
-                    if date:
-                        try:
-                            date = parser.isoparse(date).date()
-                            if date < oldest_date:
-                                oldest_date = date
-                        except ValueError:
-                            self._log.error("Could not parse date {0} for recording {1}", date, rec)
-
-                # Remove recording from cache if no longer needed
-                if approach == 'recordings' or (approach == 'hybrid' and oldest_date != starting_date):
-                    self._recordings_cache.pop(rec_id, None)
+            oldest_date = self._extract_oldest_recording_date(recordings, starting_date, is_cover, approach)
 
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
-            for rec in recordings:
-                rec_id = rec['recording'] if 'recording' in rec else rec
-                if 'id' not in rec_id:
-                    continue
-                rec_id = rec_id['id']
+            oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover)
 
-                fetched_recording = None
-
-                # Shorten recordings list, but if song is a cover, only keep covers
-                if is_cover:
-                    if 'attribute-list' not in rec or 'cover' not in rec['attribute-list']:
-                        self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
-                        continue
-                    else:
-                        # Filter by artist, but only if cover, to avoid a group splitting up into solos not matching
-                        fetched_recording = self._get_recording(rec_id)
-                        if not _contains_artist(fetched_recording, artist_ids):
-                            self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
-                            continue
-                elif self.config['filter_recordings'] and 'attribute-list' in rec:  # If live, cover etc.
-                    self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
-                    continue
-
-                if not fetched_recording:
-                    fetched_recording = self._get_recording(rec_id)
-
-                if 'release-list' in fetched_recording:
-                    for release in fetched_recording['release-list']:
-                        if release_types is None or (  # Filter by recording type, i.e. Official
-                                'status' in release and release['status'] in release_types):
-                            if 'date' in release:
-                                release_date = release['date']
-                                if release_date:
-                                    try:
-                                        date = parser.isoparse(release_date).date()
-                                        if date < oldest_date:
-                                            oldest_date = date
-                                    except ValueError:
-                                        self._log.error("Could not parse date {0} for recording {1}", release_date, rec)
-
-                self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
-
-        return None if oldest_date == datetime.date.today() else {'year': oldest_date.year,
-                                                                  'month': oldest_date.month,
-                                                                  'day': oldest_date.day}
+        return None if oldest_date == datetime.date.today() else \
+            {'year': oldest_date.year, 'month': oldest_date.month, 'day': oldest_date.day}
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
