@@ -4,6 +4,97 @@ from dateutil import parser
 import oldestdate
 
 
+class DateWrapperTest(unittest.TestCase):
+    def test_creating_date(self):
+        result = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertEqual(2022, result.y)
+        self.assertEqual(12, result.m)
+        self.assertEqual(10, result.d)
+
+    def test_less_than_year(self):
+        first_date = oldestdate.DateWrapper(2021, 12, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertTrue(first_date < second_date)
+
+    def test_less_than_month(self):
+        first_date = oldestdate.DateWrapper(2022, 11, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertTrue(first_date < second_date)
+
+    def test_less_than_day(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 9)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertTrue(first_date < second_date)
+
+    # If a value is None, that date should be bigger
+    # This means when testing for oldest (smallest) the one with values gets picked
+    def test_less_than_none_month(self):
+        first_date = oldestdate.DateWrapper(2022, None, 9)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertFalse(first_date < second_date)
+
+    def test_less_than_none_day(self):
+        first_date = oldestdate.DateWrapper(2022, 12, None)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertFalse(first_date < second_date)
+
+    def test_less_than_none_month_day(self):
+        first_date = oldestdate.DateWrapper(2022, None, None)
+        second_date = oldestdate.DateWrapper(2022, 1, 1)
+        self.assertFalse(first_date < second_date)
+
+    def test_less_than_none_month_backwards(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 9)
+        second_date = oldestdate.DateWrapper(2022, None, 10)
+        self.assertTrue(first_date < second_date)
+
+    def test_less_than_none_day_backwards(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, None)
+        self.assertTrue(first_date < second_date)
+
+    def test_less_than_none_month_day_backwards(self):
+        first_date = oldestdate.DateWrapper(2022, 1, 1)
+        second_date = oldestdate.DateWrapper(2022, None, None)
+        self.assertTrue(first_date < second_date)
+
+    def test_equal(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertEqual(first_date, first_date)
+        self.assertEqual(first_date, second_date)
+
+    def test_equal_none_month(self):
+        first_date = oldestdate.DateWrapper(2022, None, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertNotEqual(first_date, second_date)
+
+    def test_equal_none_month_backwards(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 10)
+        second_date = oldestdate.DateWrapper(2022, None, 10)
+        self.assertNotEqual(first_date, second_date)
+
+    def test_equal_none_months(self):
+        first_date = oldestdate.DateWrapper(2022, None, 10)
+        second_date = oldestdate.DateWrapper(2022, None, 10)
+        self.assertTrue(first_date == second_date)
+
+    def test_equal_none_day(self):
+        first_date = oldestdate.DateWrapper(2022, 12, None)
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertNotEqual(first_date, second_date)
+
+    def test_equal_none_day_backwards(self):
+        first_date = oldestdate.DateWrapper(2022, 12, 10)
+        second_date = oldestdate.DateWrapper(2022, 12, None)
+        self.assertNotEqual(first_date, second_date)
+
+    def test_equal_none_days(self):
+        first_date = oldestdate.DateWrapper(2022, 12, None)
+        second_date = oldestdate.DateWrapper(2022, 12, None)
+        self.assertTrue(first_date == second_date)
+
+
 class OldestDatePluginTest(unittest.TestCase):
     @classmethod
     def setUpClass(self):

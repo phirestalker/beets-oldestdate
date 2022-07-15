@@ -82,6 +82,54 @@ def _date_from_file(year, month, day):
     return file_date
 
 
+class DateWrapper(datetime.datetime):
+    # todo move some of the above utility methods to this class
+
+    def __new__(cls, y, m, d):
+        if y is None:
+            raise TypeError("Must specify a value for year")
+        year = y
+        month = 1 if m is None else m
+        day = 1 if d is None else d
+
+        return datetime.datetime.__new__(cls, year, month, day)
+
+    def __init__(self, y, m, d):
+        self.y = y
+        self.m = m
+        self.d = d
+
+    def __lt__(self, other):
+        if self.y != other.y:
+            return self.y < other.y
+        elif self.m is None:
+            return False
+        else:
+            if other.m is None:
+                return True
+            elif self.m == other.m:
+                if self.d is None:
+                    return False
+                else:
+                    if other.d is None:
+                        return True
+                    else:
+                        return self.d < other.d
+            else:
+                return self.m < other.m
+
+    def __eq__(self, other):
+        if self.y != other.y:
+            return False
+        elif self.m is not None and other.m is not None:
+            if self.d is not None and other.d is not None:
+                return self.d == other.d
+            else:
+                return self.m == other.m
+        else:
+            return self.m == other.m
+
+
 class OldestDatePlugin(BeetsPlugin):
     _importing = False
     _recordings_cache = dict()
@@ -220,8 +268,16 @@ class OldestDatePlugin(BeetsPlugin):
         # Write over the date tag if configured
         if self.config['overwrite_date']:
             oldest_date_string = oldest_date.strftime('%Y-%m-%d')
-            self._log.warning('Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}', item, oldest_date_string)
-            item.date = oldest_date
+            self._log.warning(
+                'Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}', item,
+                oldest_date_string)
+            item.year = oldest_date.year
+            # item.month = oldest_date.month
+            # item.day = oldest_date.day
+            item.month = ""
+            item.day = ""
+            # setting a field to an empty string works to remove it
+            # todo if there is no month or no day, don't overwrite them
 
         self._log.info('Applying changes to {0.artist} - {0.title}', item)
         item.store()
@@ -275,7 +331,7 @@ class OldestDatePlugin(BeetsPlugin):
         return oldest_date
 
     # Get oldest date from a release
-    def _extract_oldest_release_date(self, recordings, starting_date, is_cover):
+    def _extract_oldest_release_date(self, recordings, starting_date, is_cover, artist_ids):
         oldest_date = starting_date
         release_types = self.config['release_types'].get()
 
@@ -334,7 +390,7 @@ class OldestDatePlugin(BeetsPlugin):
 
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
-            oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover)
+            oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover, artist_ids)
 
         return None if oldest_date == datetime.date.today() else oldest_date
 
