@@ -118,8 +118,7 @@ class OldestDatePlugin(BeetsPlugin):
         for recording_field in (
                 'recording_year',
                 'recording_month',
-                'recording_day',
-                'recording_disambiguation'):
+                'recording_day'):
             field = mediafile.MediaField(
                 mediafile.MP3DescStorageStyle(recording_field),
                 mediafile.MP4StorageStyle('----:com.apple.iTunes:{}'.format(
@@ -162,9 +161,9 @@ class OldestDatePlugin(BeetsPlugin):
                       + "%22&type=recording&limit=100&method=advanced"
 
         while not self._has_work_id(recording_id):
-            recording_year = self._get_oldest_date(recording_id,
+            recording_date = self._get_oldest_date(recording_id,
                                                    _date_from_file(task.item.year, task.item.month, task.item.day))
-            recording_year_string = None if recording_year is None else str(recording_year['year'])
+            recording_year_string = None if recording_date is None else recording_date.strftime('%Y-%m-%d')
 
             self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix "
                             "and try again!", match,
@@ -214,27 +213,21 @@ class OldestDatePlugin(BeetsPlugin):
             self._log.error('No date found for {0.artist} - {0.title}', item)
             return
 
-        write = False
-        for recording_field in ('year', 'month', 'day'):
-            if recording_field in oldest_date.keys():
-                item['recording_' + recording_field] = oldest_date[recording_field]
+        item['recording_year'] = oldest_date.year
+        item['recording_month'] = oldest_date.month
+        item['recording_day'] = oldest_date.day
 
-                # Write over the year tag if configured
-                if self.config['overwrite_year'] and recording_field == 'year':
-                    self._log.warning('Overwriting year field for: {0.artist} - {0.title} from {1} to {2}', item,
-                                      item[recording_field], oldest_date[recording_field])
-                    item[recording_field] = oldest_date[recording_field]
-                write = True
+        # Write over the date tag if configured
+        if self.config['overwrite_date']:
+            oldest_date_string = oldest_date.strftime('%Y-%m-%d')
+            self._log.warning('Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}', item, oldest_date_string)
+            item.date = oldest_date
 
-        if write:
-            self._log.info('Applying changes to {0.artist} - {0.title}', item)
-            # prevent changing file on disk before it reaches final destination
-            # item.write()
-            item.store()
-            if not self._importing:
-                item.write()
-        else:
-            self._log.info('Error: {0}', oldest_date)
+        self._log.info('Applying changes to {0.artist} - {0.title}', item)
+        item.store()
+        # Prevent changing file on disk before it reaches final destination
+        if not self._importing:
+            item.write()
 
     # Fetch and cache recording from MusicBrainz, including releases and work relations
     def _fetch_recording(self, recording_id):
@@ -343,8 +336,7 @@ class OldestDatePlugin(BeetsPlugin):
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover)
 
-        return None if oldest_date == datetime.date.today() else \
-            {'year': oldest_date.year, 'month': oldest_date.month, 'day': oldest_date.day}
+        return None if oldest_date == datetime.date.today() else oldest_date
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
