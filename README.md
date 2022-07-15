@@ -13,7 +13,7 @@ Clone the repo and run `python setup.py install`, then add `oldestdate` to the l
  filter_on_import | True | During import, weight down candidates with no work_id so you are more likely to choose a recording with a work_id
  prompt_missing_work_id | True | During import, prompt to fix work_id if missing from chosen recording
  force | False | Run even if `recording_` tags have already been applied to the track
- overwrite_year | False | Overwrite the year MP3 tag field
+ overwrite_date | False | Overwrite the date MP3 tag field, inluding year, month, and day
  filter_recordings | True | Skip recordings that have attributes before fetching them. This is usually live recordings
  approach | releases | What approach to use to find oldest date. Possible values: `recordings, releases, hybrid, both`. `recordings` works like `beets-recordingdate` did, `releases` is a far more accurate method.
  release_types | None | Filter releases by type, e.g. `['Official']`. Usually not needed
@@ -30,7 +30,7 @@ Clone the repo and run `python setup.py install`, then add `oldestdate` to the l
       filter_on_import: yes
       prompt_missing_work_id: yes
       force: yes
-      overwrite_year: yes
+      overwrite_date: yes
       filter_recordings: yes
       approach: 'releases'
   
@@ -41,6 +41,7 @@ The plugin will take the recording that was chosen and get its `work_id`. From t
 
 ### Missing work_id
 If the chosen recording has no Work associated with it, the plugin cannot do its job. This is where `filter_on_import` comes in: it applies a negative score to tracks that don't have an associated work so they are much less likely to be chosen. However, this means some of the displayed tracks will be irrelevant. Thus, setting the `searchlimit` to 20 or so tracks is needed to hit the one recording that *does* have a work. This happens to work quite well with famous songs because there is usually a single recording with an associated work that is the original recording, and thus the oldest. If we match with this one, the other recordings that we can't get to because they are not associated with the same work are irrelevant, because we already have the oldest date.  
+
 However, it sometimes happens that there is no available recording that matches our track with an associated work. This is what `prompt_missing_work_id` is for: it will prompt us to either just use the single matched recording, in which case only the matched recording's data is used, and checked against the embedded date, or we can try again, or skip the track. Trying again is so that we may go to the website and amend the data, so that the recordings will have an associated work. To help with this process, the plugin prints out a URL to a search for that specific track. Your task is to create a work and associate it with all the relevant recordings, then press try again. This can be quite a laborious task, so if we see that the date printed by the plugin as being the oldest date found with just the selected recording seems accurate, choosing `Use this recording` would be the best choice.
 
 ### Covers
