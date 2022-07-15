@@ -95,7 +95,7 @@ class OldestDatePlugin(BeetsPlugin):
             'filter_on_import': True,  # During import, weight down candidates with no work_id
             'prompt_missing_work_id': True,  # During import, prompt to fix work_id if missing
             'force': False,  # Run even if already processed
-            'overwrite_year': False,  # Overwrite year field in tags
+            'overwrite_date': False,  # Overwrite date field in tags
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
             'release_types': None,  # Filter by release type, e.g. ['Official']
