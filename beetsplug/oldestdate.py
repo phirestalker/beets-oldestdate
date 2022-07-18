@@ -8,7 +8,6 @@ from beets import ui, config
 from beets.autotag import hooks
 from beets.importer import action
 from beets.plugins import BeetsPlugin
-from dateutil import parser
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
@@ -68,27 +67,23 @@ def _is_cover(recording):
     return False
 
 
-def _date_from_file(year, month, day):
-    file_date = None
-    try:
-        file_date_str = str(year) + str(month) + str(day)
-        file_date = parser.isoparse(file_date_str).date()
-    except (KeyError, ValueError):
-        try:
-            file_date_str = str(year) + "0101"  # First of January
-            file_date = parser.isoparse(file_date_str).date()
-        except (KeyError, ValueError):
-            pass
-    return file_date
-
-
 class DateWrapper(datetime.datetime):
-    # todo move some of the above utility methods to this class
-
     def __new__(cls, y, m, d):
         if y is None:
             raise TypeError("Must specify a value for year")
         year = y
+        month = 1 if m is None else m
+        day = 1 if d is None else d
+
+        return datetime.datetime.__new__(cls, year, month, day)
+
+    def __new__(cls, iso_string):
+        # grab first four chars of string for the year
+        if y is None:
+            raise TypeError("Must specify a value for year")
+        year = y
+        # if there is a month, grab that too
+        # there could be a hypen separator??
         month = 1 if m is None else m
         day = 1 if d is None else d
 
@@ -261,23 +256,24 @@ class OldestDatePlugin(BeetsPlugin):
             self._log.error('No date found for {0.artist} - {0.title}', item)
             return
 
-        item['recording_year'] = oldest_date.year
-        item['recording_month'] = oldest_date.month
-        item['recording_day'] = oldest_date.day
+        if oldest_date.y is not None:
+            item['recording_year'] = oldest_date.y
+        if oldest_date.m is not None:
+            item['recording_month'] = oldest_date.m
+        if olderst_date.d is not None:
+            item['recording_day'] = oldest_date.d
 
         # Write over the date tag if configured
+        year_string = str(oldest_date.y).zfill(4)
+        month_string = str(oldest_date.m).zfill(2)
+        day_string = str(oldest_date.d).zfill(2)
+
         if self.config['overwrite_date']:
-            oldest_date_string = oldest_date.strftime('%Y-%m-%d')
             self._log.warning(
-                'Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}', item,
-                oldest_date_string)
-            item.year = oldest_date.year
-            # item.month = oldest_date.month
-            # item.day = oldest_date.day
-            item.month = ""
-            item.day = ""
-            # setting a field to an empty string works to remove it
-            # todo if there is no month or no day, don't overwrite them
+                'Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}-{2}-{3}', item, year_string, month_string, day_string)
+            item.year = "" if oldest_date.y is None else year_string
+            item.month = "" if oldest_date.m is None else month_string
+            item.day = "" if oldest_date.d is None else day_string
 
         self._log.info('Applying changes to {0.artist} - {0.title}', item)
         item.store()
@@ -318,7 +314,7 @@ class OldestDatePlugin(BeetsPlugin):
                 date = rec['begin']
                 if date:
                     try:
-                        date = parser.isoparse(date).date()
+                        date = DateWrapper(date)
                         if date < oldest_date:
                             oldest_date = date
                     except ValueError:
@@ -369,7 +365,7 @@ class OldestDatePlugin(BeetsPlugin):
                             release_date = release['date']
                             if release_date:
                                 try:
-                                    date = parser.isoparse(release_date).date()
+                                    date = DateWrapper(release_date)
                                     if date < oldest_date:
                                         oldest_date = date
                                 except ValueError:
@@ -392,7 +388,9 @@ class OldestDatePlugin(BeetsPlugin):
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
             oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover, artist_ids)
 
-        return None if oldest_date == datetime.date.today() else oldest_date
+        today = datetime.date.today()
+        dw_today = DateWrapper(today.year, today.month, today.day)
+        return None if oldest_date == dw_today else oldest_date
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
@@ -402,7 +400,7 @@ class OldestDatePlugin(BeetsPlugin):
 
         # If no work id, check this recording against embedded date
         starting_date = item_date if item_date is not None and (
-                self.config['use_file_date'] or not work_id) else datetime.date.today()
+                self.config['use_file_date'] or not work_id) else dw_today
 
         if not work_id:  # Only look through this recording
             return self._iterate_dates([recording], starting_date, is_cover, artist_ids)
