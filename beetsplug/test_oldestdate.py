@@ -107,8 +107,8 @@ class OldestDatePluginTest(unittest.TestCase):
 
     def test_extract_oldest_recording_date(self):
         recordings = [{"recording": {"id": 20}, "begin": "2020-12-12"}]
-        starting_date = parser.isoparse("20221010").date()
-        expected_date = parser.isoparse("20201212").date()
+        starting_date = parser.isoparse("20221010")
+        expected_date = parser.isoparse("20201212")
         is_cover = False
         approach = "recordings"
         result = self.oldestdateplugin._extract_oldest_recording_date(recordings, starting_date, is_cover, approach)
@@ -116,8 +116,8 @@ class OldestDatePluginTest(unittest.TestCase):
 
     def test_extract_oldest_recording_date_with_only_year(self):
         recordings = [{"recording": {"id": 20}, "begin": "1978"}]
-        starting_date = parser.isoparse("20221010").date()
-        expected_date = parser.isoparse("19780101").date()
+        starting_date = parser.isoparse("20221010")
+        expected_date = parser.isoparse("19780101")
         is_cover = False
         approach = "recordings"
         result = self.oldestdateplugin._extract_oldest_recording_date(recordings, starting_date, is_cover, approach)
