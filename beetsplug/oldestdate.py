@@ -1,6 +1,5 @@
-from __future__ import division, absolute_import, print_function
-
 import datetime
+from dateutil import parser
 
 import mediafile
 import musicbrainzngs
@@ -8,7 +7,6 @@ from beets import ui, config
 from beets.autotag import hooks
 from beets.importer import action
 from beets.plugins import BeetsPlugin
-from dateutil import parser
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
@@ -89,7 +87,8 @@ class DateWrapper(datetime.datetime):
             month = 1 if m is None else m
             day = 1 if d is None else d
         elif iso_string is not None:
-            return parser.isoparse(iso_string)
+            parsed = parser.isoparse(iso_string)
+            return datetime.datetime.__new__(cls, parsed.year, parsed.month, parsed.day)
         else:
             raise TypeError("Must specify a value for year or a date string")
 
@@ -112,15 +111,16 @@ class DateWrapper(datetime.datetime):
 
             if length < 4:
                 raise ValueError("Invalid value for year")
+
             self.y = int(iso_string[:4])
             self.m = None
             self.d = None
 
             # Month and day are optional
             if length >= 6:
-                self.m = int(iso_string[5:6])
+                self.m = int(iso_string[4:6])
                 if length >= 8:
-                    self.d = int(iso_string[7:8])
+                    self.d = int(iso_string[6:8])
         else:
             raise TypeError("Must specify a value for year or a date string")
 
@@ -235,7 +235,7 @@ class OldestDatePlugin(BeetsPlugin):
 
         while not self._has_work_id(recording_id):
             recording_date = self._get_oldest_date(recording_id,
-                                                   _date_from_file(task.item.year, task.item.month, task.item.day))
+                                                   DateWrapper(task.item.year, task.item.month, task.item.day))
             recording_year_string = None if recording_date is None else recording_date.strftime('%Y-%m-%d')
 
             self._log.error("{0.artist} - {0.title} ({1}) has no associated work! Please fix "
@@ -280,7 +280,7 @@ class OldestDatePlugin(BeetsPlugin):
             return
 
         # Get oldest date from MusicBrainz
-        oldest_date = self._get_oldest_date(item.mb_trackid, _date_from_file(item.year, item.month, item.day))
+        oldest_date = self._get_oldest_date(item.mb_trackid, DateWrapper(item.year, item.month, item.day))
 
         if not oldest_date:
             self._log.error('No date found for {0.artist} - {0.title}', item)
@@ -290,7 +290,7 @@ class OldestDatePlugin(BeetsPlugin):
             item['recording_year'] = oldest_date.y
         if oldest_date.m is not None:
             item['recording_month'] = oldest_date.m
-        if olderst_date.d is not None:
+        if oldest_date.d is not None:
             item['recording_day'] = oldest_date.d
 
         # Write over the date tag if configured

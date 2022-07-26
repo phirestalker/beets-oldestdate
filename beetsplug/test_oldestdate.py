@@ -1,6 +1,4 @@
 import unittest
-from dateutil import parser
-
 import oldestdate
 
 
@@ -94,6 +92,26 @@ class DateWrapperTest(unittest.TestCase):
         second_date = oldestdate.DateWrapper(2022, 12, None)
         self.assertTrue(first_date == second_date)
 
+    def test_isostring(self):
+        first_date = oldestdate.DateWrapper(iso_string="2022-12-10")
+        second_date = oldestdate.DateWrapper(2022, 12, 10)
+        self.assertTrue(first_date == second_date)
+
+    def test_isostring_year_month(self):
+        first_date = oldestdate.DateWrapper(iso_string="2022-12")
+        second_date = oldestdate.DateWrapper(2022, 12)
+        self.assertTrue(first_date == second_date)
+
+    def test_isostring_year(self):
+        first_date = oldestdate.DateWrapper(iso_string="2022")
+        second_date = oldestdate.DateWrapper(2022)
+        self.assertTrue(first_date == second_date)
+
+        # Create new datetime using isostring
+        # test isostring with only year, year and month, day, empty string
+        # new datetime with no year nor string should send error
+        # calling today should return today's date
+
 
 class OldestDatePluginTest(unittest.TestCase):
     @classmethod
@@ -107,8 +125,8 @@ class OldestDatePluginTest(unittest.TestCase):
 
     def test_extract_oldest_recording_date(self):
         recordings = [{"recording": {"id": 20}, "begin": "2020-12-12"}]
-        starting_date = parser.isoparse("20221010")
-        expected_date = parser.isoparse("20201212")
+        starting_date = oldestdate.DateWrapper(iso_string="20221010")
+        expected_date = oldestdate.DateWrapper(iso_string="20201212")
         is_cover = False
         approach = "recordings"
         result = self.oldestdateplugin._extract_oldest_recording_date(recordings, starting_date, is_cover, approach)
@@ -116,8 +134,8 @@ class OldestDatePluginTest(unittest.TestCase):
 
     def test_extract_oldest_recording_date_with_only_year(self):
         recordings = [{"recording": {"id": 20}, "begin": "1978"}]
-        starting_date = parser.isoparse("20221010")
-        expected_date = parser.isoparse("19780101")
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1978)
         is_cover = False
         approach = "recordings"
         result = self.oldestdateplugin._extract_oldest_recording_date(recordings, starting_date, is_cover, approach)
