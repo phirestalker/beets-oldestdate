@@ -121,7 +121,7 @@ class DateWrapperTest(unittest.TestCase):
         today = datetime.datetime.today()
         second_date = oldestdate.DateWrapper(today.year, today.month, today.day)
 
-        self.assertTrue(first_date, second_date)
+        self.assertEqual(first_date, second_date)
 
 
 class OldestDatePluginTest(unittest.TestCase):
@@ -225,7 +225,7 @@ class OldestDatePluginTest(unittest.TestCase):
         self.oldestdateplugin.config['filter_recordings'] = True
         recordings = [
             {"recording": {"id": self.recording_id}, "begin": "1978", "release-list": [{"date": "1976"}]},
-            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["Live"],
+            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["live"],
              "release-list": [{"date": "1977"}], "artist-credit": [{"artist": {"id": "artist-id"}}]},
             {"recording": {"id": self.recording_id + 2}, "begin": "1978", "attribute-list": ["cover"],
              "release-list": [{"date": "1975"}], "artist-credit": [{"artist": {"id": "another-id"}}]}
@@ -244,8 +244,9 @@ class OldestDatePluginTest(unittest.TestCase):
     def test_extract_oldest_release_date_release_type(self):
         self.oldestdateplugin.config['release_types'] = ["Official"]
         recordings = [
-            {"recording": {"id": self.recording_id}, "begin": "1978", "release-list": [{"date": "1976", "status": "Bootleg"}]},
-            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["Live"],
+            {"recording": {"id": self.recording_id}, "begin": "1978",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["live"],
              "release-list": [{"date": "1977", "status": "Official"}]},
             {"recording": {"id": self.recording_id + 2}, "begin": "1978", "attribute-list": ["cover"],
              "release-list": [{"date": "1975"}], "artist-credit": [{"artist": {"id": "another-id"}}]}
@@ -261,11 +262,109 @@ class OldestDatePluginTest(unittest.TestCase):
         self.assertEqual(expected_date, result)
         self.oldestdateplugin.config['release_types'] = None
 
-    # Test hybrid approach
+    def test_iterate_dates_recordings(self):
+        self.oldestdateplugin.config['approach'] = "recordings"
+        recordings = [
+            {"recording": {"id": self.recording_id}, "begin": "1978",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["live"],
+             "release-list": [{"date": "1977", "status": "Official"}]},
+            {"recording": {"id": self.recording_id + 2}, "begin": "1978", "attribute-list": ["cover"],
+             "release-list": [{"date": "1975"}]}
+        ]
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1978)
 
-    # Test both approach
+        # Put recordings into cache to avoid calling the API
+        for i in range(len(recordings)):
+            self.oldestdateplugin._recordings_cache[self.recording_id + i] = recordings[i]
 
-    # use_file_date
+        result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
+        self.assertEqual(expected_date, result)
+        self.oldestdateplugin.config['approach'] = "releases"
+
+    def test_iterate_dates_releases(self):
+        self.oldestdateplugin.config['approach'] = "releases"
+        recordings = [
+            {"recording": {"id": self.recording_id}, "begin": "1978",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["live"],
+             "release-list": [{"date": "1975", "status": "Official"}]},
+            {"recording": {"id": self.recording_id + 2}, "begin": "1974", "attribute-list": ["cover"],
+             "release-list": [{"date": "1975"}]}  # cover gets filtered out
+        ]
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1975)
+
+        # Put recordings into cache to avoid calling the API
+        for i in range(len(recordings)):
+            self.oldestdateplugin._recordings_cache[self.recording_id + i] = recordings[i]
+
+        result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
+        self.assertEqual(expected_date, result)
+
+    def test_iterate_dates_hybrid_found(self):
+        self.oldestdateplugin.config['approach'] = "hybrid"
+        recordings = [
+            {"recording": {"id": self.recording_id}, "begin": "1978",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "1978", "attribute-list": ["live"],
+             "release-list": [{"date": "1975", "status": "Official"}]},
+            {"recording": {"id": self.recording_id + 2}, "begin": "1974", "attribute-list": ["cover"],
+             "release-list": [{"date": "1975"}]}  # cover gets filtered out
+        ]
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1978)
+
+        # Put recordings into cache to avoid calling the API
+        for i in range(len(recordings)):
+            self.oldestdateplugin._recordings_cache[self.recording_id + i] = recordings[i]
+
+        result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
+        self.assertEqual(expected_date, result)
+        self.oldestdateplugin.config['approach'] = "releases"
+
+    def test_iterate_dates_hybrid_not_found(self):
+        self.oldestdateplugin.config['approach'] = "hybrid"
+        recordings = [
+            {"recording": {"id": self.recording_id}, "begin": "",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "", "attribute-list": ["live"],
+             "release-list": [{"date": "1975", "status": "Official"}]},
+            {"recording": {"id": self.recording_id + 2}, "begin": "", "attribute-list": ["cover"],
+             "release-list": [{"date": "1975"}]}  # cover gets filtered out
+        ]
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1975)
+
+        # Put recordings into cache to avoid calling the API
+        for i in range(len(recordings)):
+            self.oldestdateplugin._recordings_cache[self.recording_id + i] = recordings[i]
+
+        result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
+        self.assertEqual(expected_date, result)
+        self.oldestdateplugin.config['approach'] = "releases"
+
+    def test_iterate_dates_both(self):
+        self.oldestdateplugin.config['approach'] = "both"
+        recordings = [
+            {"recording": {"id": self.recording_id}, "begin": "",
+             "release-list": [{"date": "1976", "status": "Bootleg"}]},
+            {"recording": {"id": self.recording_id + 1}, "begin": "1974", "attribute-list": ["live"],
+             "release-list": [{"date": "1975", "status": "Official"}]},
+            {"recording": {"id": self.recording_id + 2}, "begin": "1973", "attribute-list": ["cover"],
+             "release-list": [{"date": "1975"}]}  # cover gets filtered out
+        ]
+        starting_date = oldestdate.DateWrapper(2022, 10, 10)
+        expected_date = oldestdate.DateWrapper(1974)
+
+        # Put recordings into cache to avoid calling the API
+        for i in range(len(recordings)):
+            self.oldestdateplugin._recordings_cache[self.recording_id + i] = recordings[i]
+
+        result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
+        self.assertEqual(expected_date, result)
+        self.oldestdateplugin.config['approach'] = "releases"
 
 
 if __name__ == '__main__':

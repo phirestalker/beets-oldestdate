@@ -97,7 +97,7 @@ class DateWrapper(datetime.datetime):
     @classmethod
     def today(cls):
         today = datetime.date.today()
-        return cls.__new__(cls, today.year, today.month, today.day)
+        return DateWrapper(today.year, today.month, today.day)
 
     def __init__(self, y=None, m=None, d=None, iso_string=None):
         if y is not None:
@@ -422,10 +422,9 @@ class OldestDatePlugin(BeetsPlugin):
 
         # Look for oldest release date for each recording
         if approach in ('releases', 'both') or (approach == 'hybrid' and oldest_date == starting_date):
-            oldest_date = self._extract_oldest_release_date(recordings, starting_date, is_cover, artist_ids)
+            oldest_date = self._extract_oldest_release_date(recordings, oldest_date, is_cover, artist_ids)
 
-        today = DateWrapper.today()
-        return None if oldest_date == today else oldest_date
+        return None if oldest_date == DateWrapper.today() else oldest_date
 
     def _get_oldest_date(self, recording_id, item_date):
         recording = self._get_recording(recording_id)
