@@ -84,8 +84,8 @@ class DateWrapper(datetime.datetime):
         """
         if y is not None:
             year = y
-            month = 1 if m is None else m
-            day = 1 if d is None else d
+            month = m if (m is not None and 0 < m <= 12) else 1
+            day = d if (d is not None and 0 < d <= 31) else 1
         elif iso_string is not None:
             parsed = parser.isoparse(iso_string)
             return datetime.datetime.__new__(cls, parsed.year, parsed.month, parsed.day)
@@ -102,8 +102,8 @@ class DateWrapper(datetime.datetime):
     def __init__(self, y=None, m=None, d=None, iso_string=None):
         if y is not None:
             self.y = y
-            self.m = m
-            self.d = d
+            self.m = m if (m is None or 0 < m <= 12) else 1
+            self.d = d if (d is None or 0 < d <= 31) else 1
         elif iso_string is not None:
             # Remove any hyphen separators
             iso_string = iso_string.replace("-", "")

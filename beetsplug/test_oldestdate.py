@@ -10,6 +10,16 @@ class DateWrapperTest(unittest.TestCase):
         self.assertEqual(12, result.m)
         self.assertEqual(10, result.d)
 
+    def test_invalid_date(self):
+        result = oldestdate.DateWrapper(2022, 0, 10)
+        self.assertEqual(2022, result.y)
+        self.assertEqual(1, result.m)
+        self.assertEqual(10, result.d)
+        result = oldestdate.DateWrapper(2022, 10, 0)
+        self.assertEqual(2022, result.y)
+        self.assertEqual(10, result.m)
+        self.assertEqual(1, result.d)
+
     def test_less_than_year(self):
         first_date = oldestdate.DateWrapper(2021, 12, 10)
         second_date = oldestdate.DateWrapper(2022, 12, 10)
