@@ -56,7 +56,7 @@ def _get_artist_ids_from_recording(recording):
     return ids
 
 
-# Returns whether given recording is a cover of a work
+# Returns whether given fetched recording is a cover of a work
 def _is_cover(recording):
     if 'work-relation-list' in recording:
         for work in recording['work-relation-list']:
@@ -153,6 +153,11 @@ class DateWrapper(datetime.datetime):
                 return self.m == other.m
         else:
             return self.m == other.m
+
+
+# Fetch work, including recording relations
+def _fetch_work(work_id):
+    return musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
 
 
 class OldestDatePlugin(BeetsPlugin):
@@ -293,7 +298,7 @@ class OldestDatePlugin(BeetsPlugin):
         if oldest_date.d is not None:
             item['recording_day'] = oldest_date.d
 
-        # Write over the date tag if configured
+        # Write over the date tag if configured as YYYYMMDD
         year_string = str(oldest_date.y).zfill(4)
         month_string = str(oldest_date.m).zfill(2)
         day_string = str(oldest_date.d).zfill(2)
@@ -376,12 +381,12 @@ class OldestDatePlugin(BeetsPlugin):
                     self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
                     continue
                 else:
-                    # Filter by artist, but only if cover, to avoid a group splitting up into solos not matching
+                    # Filter by artist, but only if cover (to avoid not matching solo careers of former groups)
                     fetched_recording = self._get_recording(rec_id)
                     if not _contains_artist(fetched_recording, artist_ids):
                         self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
                         continue
-            elif self.config['filter_recordings'] and 'attribute-list' in rec:  # If live, cover etc.
+            elif 'attribute-list' in rec and (self.config['filter_recordings'] or 'cover' in rec['attribute-list']):
                 self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
                 continue
 
@@ -438,7 +443,7 @@ class OldestDatePlugin(BeetsPlugin):
             return self._iterate_dates([recording], starting_date, is_cover, artist_ids)
 
         # Fetch work, including associated recordings
-        work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
+        work = _fetch_work(work_id)
 
         if 'recording-relation-list' not in work:
             self._log.error(
