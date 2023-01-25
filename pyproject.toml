@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "beets-oldestdate"
+version = "1.1.3"
+authors = [
+    { name="kernitus" },
+]
+description = "Beets plugin that finds oldest possible track recording or release date"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mediafile~=0.9",
+    "musicbrainzngs~=0.7",
+    "python-dateutil~=2.8",
+    "beets~=1.6",
+]
+
+[project.entry-points.beetsplug]
+beets-oldestdate = "beets.oldestdate"
+
+[project.urls]
+"Homepage" = "https://github.com/kernitus/beets-oldestdate"
+"Bug Tracker" = "https://github.com/kernitus/beets-oldestdate/issues"
