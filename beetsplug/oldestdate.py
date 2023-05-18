@@ -10,7 +10,7 @@ from beets.plugins import BeetsPlugin
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.1.2",
+    "1.1.3",
     "https://github.com/kernitus/beets-oldestdate"
 )
 
@@ -73,7 +73,7 @@ class DateWrapper(datetime.datetime):
     account the month and day being optional.
     """
 
-    def __new__(cls, y=None, m=None, d=None, iso_string=None):
+    def __new__(cls, y: int = None, m: int = None, d: int = None, iso_string: str = None):
         """
         Create a new datetime object using a convenience wrapper.
         Must specify at least one of either year or iso_string.
@@ -83,7 +83,7 @@ class DateWrapper(datetime.datetime):
         :param iso_string: A string representing the date in the format YYYYMMDD. Month and day are optional.
         """
         if y is not None:
-            year = y
+            year = min(max(y, datetime.MINYEAR), datetime.MAXYEAR)
             month = m if (m is not None and 0 < m <= 12) else 1
             day = d if (d is not None and 0 < d <= 31) else 1
         elif iso_string is not None:
@@ -101,7 +101,7 @@ class DateWrapper(datetime.datetime):
 
     def __init__(self, y=None, m=None, d=None, iso_string=None):
         if y is not None:
-            self.y = y
+            self.y = min(max(y, datetime.MINYEAR), datetime.MAXYEAR)
             self.m = m if (m is None or 0 < m <= 12) else 1
             self.d = d if (d is None or 0 < d <= 31) else 1
         elif iso_string is not None:

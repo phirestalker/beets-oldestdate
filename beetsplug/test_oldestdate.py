@@ -20,6 +20,19 @@ class DateWrapperTest(unittest.TestCase):
         self.assertEqual(10, result.m)
         self.assertEqual(1, result.d)
 
+    # Force year to be within range 1 - 9999
+    def test_year_zero(self):
+        result = oldestdate.DateWrapper(0, 12, 10)
+        self.assertEqual(1, result.y)
+        self.assertEqual(12, result.m)
+        self.assertEqual(10, result.d)
+
+    def test_year_10000(self):
+        result = oldestdate.DateWrapper(10000, 12, 10)
+        self.assertEqual(9999, result.y)
+        self.assertEqual(12, result.m)
+        self.assertEqual(10, result.d)
+
     def test_less_than_year(self):
         first_date = oldestdate.DateWrapper(2021, 12, 10)
         second_date = oldestdate.DateWrapper(2022, 12, 10)
