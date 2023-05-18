@@ -10,7 +10,7 @@ from beets.plugins import BeetsPlugin
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.1.3",
+    "1.1.4",
     "https://github.com/kernitus/beets-oldestdate"
 )
 
