@@ -180,14 +180,15 @@ class OldestDatePlugin(BeetsPlugin):
             'use_file_date': False  # Also use file's embedded date when looking for oldest date
         })
 
-        if self.config['ignore_track_id']:
-            self.register_listener('import_task_created', self._import_task_created)
-        if self.config['prompt_missing_work_id']:
-            self.register_listener('import_task_choice', self._import_task_choice)
-        if self.config['filter_on_import']:
-            self.register_listener('trackinfo_received', self._import_trackinfo)
-            # Add heavy weight for missing work_id from a track
-            config['match']['distance_weights'].add({'work_id': 4})
+        if self.config['auto']:
+            if self.config['ignore_track_id']:
+                self.register_listener('import_task_created', self._import_task_created)
+            if self.config['prompt_missing_work_id']:
+                self.register_listener('import_task_choice', self._import_task_choice)
+            if self.config['filter_on_import']:
+                self.register_listener('trackinfo_received', self._import_trackinfo)
+                # Add heavy weight for missing work_id from a track
+                config['match']['distance_weights'].add({'work_id': 4})
 
         # Get global MusicBrainz host setting
         musicbrainzngs.set_hostname(config['musicbrainz']['host'].get())
