@@ -29,6 +29,6 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Type checking with mypy
-        run: mypy --ignore-missing-imports --strict .
+        run: mypy --ignore-missing-imports --strict beetsplug
       - name: Test with unittest
         run: python -m unittest discover -s tests

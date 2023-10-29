@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Optional, TypeVar
 
 from dateutil import parser
 
@@ -12,7 +12,7 @@ class DateWrapper(datetime.datetime):
     """
 
     def __new__(cls, y: Optional[int] = None, m: Optional[int] = None, d: Optional[int] = None,
-                iso_string: Optional[str] = None):
+                iso_string: Optional[str] = None) -> DateWrapper:
         """
         Create a new datetime object using a convenience wrapper.
         Must specify at least one of either year or iso_string.
@@ -37,12 +37,12 @@ class DateWrapper(datetime.datetime):
         return datetime.datetime.__new__(cls, year, month, day)
 
     @classmethod
-    def today(cls):
+    def today(cls) -> DateWrapper:
         today = datetime.date.today()
         return DateWrapper(today.year, today.month, today.day)
 
     def __init__(self, y: Optional[int] = None, m: Optional[int] = None, d: Optional[int] = None,
-                 iso_string: Optional[str] = None):
+                 iso_string: Optional[str] = None) -> None:
         if y is not None:
             self.y = min(max(y, datetime.MINYEAR), datetime.MAXYEAR)
             self.m = m if (m is None or 0 < m <= 12) else 1
@@ -74,7 +74,10 @@ class DateWrapper(datetime.datetime):
         else:
             raise TypeError("Must specify a value for year or a date string")
 
-    def __lt__(self, other):
+    def __lt__(self, other: datetime.date) -> bool:
+        if not isinstance(other, DateWrapper):
+            return NotImplemented
+
         if self.y != other.y:
             return self.y < other.y
         elif self.m is None:
@@ -93,7 +96,10 @@ class DateWrapper(datetime.datetime):
             else:
                 return self.m < other.m
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, DateWrapper):
+            return NotImplemented
+
         if self.y != other.y:
             return False
         elif self.m is not None and other.m is not None:

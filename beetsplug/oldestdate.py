@@ -17,6 +17,7 @@ musicbrainzngs.set_useragent(
 
 # Type alias
 Recording = dict[str, Any]
+Work = dict[str, Any]
 
 
 def _get_work_id_from_recording(recording: Recording) -> Optional[str]:
@@ -70,16 +71,17 @@ def _is_cover(recording: Recording) -> bool:
     return False
 
 
-def _fetch_work(work_id: str) -> Recording:
+def _fetch_work(work_id: str) -> dict[str, Any]:
     """Fetch work, including recording relations"""
-    return musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
+    work: Work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
+    return work
 
 
-class OldestDatePlugin(BeetsPlugin):
+class OldestDatePlugin(BeetsPlugin): # type: ignore
     _importing: bool = False
     _recordings_cache: dict[str, Recording] = dict()
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(OldestDatePlugin, self).__init__()
         self.import_stages = [self._on_import]
         self.config.add({
@@ -122,7 +124,7 @@ class OldestDatePlugin(BeetsPlugin):
                 mediafile.StorageStyle(recording_field))
             self.add_media_field(recording_field, field)
 
-    def commands(self):
+    def commands(self) -> list[ui.Subcommand]:
         recording_date_command = ui.Subcommand(
             'oldestdate',
             help="Retrieve the date of the oldest known recording or release of a track.",
@@ -240,7 +242,7 @@ class OldestDatePlugin(BeetsPlugin):
 
     def _fetch_recording(self, recording_id: str) -> Recording:
         """Fetch and cache recording from MusicBrainz, including releases and work relations"""
-        recording = musicbrainzngs.get_recording_by_id(recording_id, ['artists', 'releases', 'work-rels'])['recording']
+        recording: Recording = musicbrainzngs.get_recording_by_id(recording_id, ['artists', 'releases', 'work-rels'])['recording']
         self._recordings_cache[recording_id] = recording
         return recording
 
