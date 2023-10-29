@@ -1,6 +1,12 @@
 import unittest
+from unittest import mock
+from unittest.mock import patch, PropertyMock
+
+from beets.plugins import BeetsPlugin
+
 from beetsplug import oldestdate
 from beetsplug.date_wrapper import DateWrapper
+from beets.library import Item
 
 
 class OldestDatePluginTest(unittest.TestCase):
@@ -244,6 +250,60 @@ class OldestDatePluginTest(unittest.TestCase):
         result = self.oldestdateplugin._iterate_dates(recordings, starting_date, False, [])
         self.assertEqual(expected_date, result)
         self.oldestdateplugin.config['approach'] = "releases"
+
+    # Test data_source not being Musicbrainz
+    def test_track_distance_skip_non_musicbrainz_source(self):
+        self.oldestdateplugin.config['filter_on_import'] = True
+        # Create a mock track info with a non-MusicBrainz source
+        mock_info = mock.Mock()
+        mock_info.data_source = "NonMusicBrainz"
+
+        # Make sure track does not have work id
+        with patch.object(self.oldestdateplugin, '_has_work_id', return_value=False):
+            dist = self.oldestdateplugin.track_distance(None, mock_info)
+
+        # Assert that the distance is zero, indicating that the track was skipped
+        self.assertEqual(0, dist.distance)
+
+    def test_track_distance_dont_skip_musicbrainz_source(self):
+        self.oldestdateplugin.config['filter_on_import'] = True
+        # Create a mock track info with a MusicBrainz source
+        mock_info = mock.Mock()
+        mock_info.data_source = "MusicBrainz"
+
+        # Make sure track does not have work id
+        with patch.object(self.oldestdateplugin, '_has_work_id', return_value=False):
+            dist = self.oldestdateplugin.track_distance(None, mock_info)
+
+        # Assert that the distance is not zero, indicating that the track was used
+        self.assertEqual(1, dist.distance)
+
+    @patch('logging.Logger.info')
+    def test_process_file_musicbrainz(self, mock_log):
+        # Create a mock item with a MusicBrainz track ID and source
+        self.oldestdateplugin.config['force'] = False
+        item = Item(mb_trackid="some_track_id", data_source="MusicBrainz", artist="Test Artist", title="Test Title",
+                    recording_year="2022")
+
+        # Call _process_file method
+        self.oldestdateplugin._process_file(item)
+
+        # Assert that the log method was not called, indicating that the track was not skipped
+        mock_log.info.assert_not_called()
+
+    @patch('logging.Logger.info')
+    def test_process_file_non_musicbrainz(self, mock_log):
+        # Create a mock item with a non MusicBrainz track ID and source
+        self.oldestdateplugin.config['force'] = False
+        item = Item(mb_trackid="some_track_id", data_source="NonMusicBrainz", artist="Test Artist", title="Test Title")
+
+        # Call _process_file method
+        self.oldestdateplugin._process_file(item)
+
+        # Assert that the log method was called, indicating that the track was skipped
+        mock_log.assert_called_once_with(
+            'Skipping track with no mb_trackid: {0.artist} - {0.title}', item
+        )
 
 
 if __name__ == '__main__':

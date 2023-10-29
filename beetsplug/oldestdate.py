@@ -1,8 +1,9 @@
 import mediafile
 import musicbrainzngs
 from beets import ui, config
-from beets.autotag import hooks
+from beets.autotag import hooks, TrackInfo
 from beets.importer import action
+from beets.library import Item
 from beets.plugins import BeetsPlugin
 
 from .date_wrapper import DateWrapper
@@ -127,7 +128,7 @@ class OldestDatePlugin(BeetsPlugin):
         if 'track_id' in info:
             self._fetch_recording(info.track_id)
 
-    def track_distance(self, session, info):
+    def track_distance(self, _, info: TrackInfo):
         dist = hooks.Distance()
         if info.data_source != 'MusicBrainz':
             self._log.debug('Skipping track with non MusicBrainz data source {0.artist} - {0.title}', info)
@@ -187,7 +188,7 @@ class OldestDatePlugin(BeetsPlugin):
             for item in task.imported_items():
                 self._process_file(item)
 
-    def _process_file(self, item):
+    def _process_file(self, item: Item):
         if not item.mb_trackid or item.data_source != 'MusicBrainz':
             self._log.info('Skipping track with no mb_trackid: {0.artist} - {0.title}', item)
             return
