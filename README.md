@@ -12,20 +12,21 @@ necessary. The plugin is intended to be used in singleton mode. Undefined behavi
 
 # Configuration
 
- |               Key      | Default Value | Description  
- :----------------------:|:-------------:| :-----:
-          auto          |     True      | Run oldestdate during the import phase
-    ignore_track_id     |     False     | During import, ignore existing track_id. Needed if using plugin on a library already tagged by MusicBrainz
-    filter_on_import    |     True      | During import, weight down candidates with no work_id so you are more likely to choose a recording with a work_id
- prompt_missing_work_id |     True      | During import, prompt to fix work_id if missing from chosen recording
-         force          |     False     | Run even if `recording_` tags have already been applied to the track
-     overwrite_date     |     False     | Overwrite the date MP3 tag field, inluding year, month, and day
-    overwrite_month     |     True      | If overwriting date, also overwrite month field, otherwise leave blank
-     overwrite_day      |     True      | If overwriting date, also overwrite day, otherwise leave blank
-   filter_recordings    |     True      | Skip recordings that have attributes before fetching them. This is usually live recordings
-        approach        |   releases    | What approach to use to find oldest date. Possible values: `recordings, releases, hybrid, both`. `recordings` works like `beets-recordingdate` did, `releases` is a far more accurate method. Hybrid only fetches releases if no date was found in recordings.
-     release_types      |     None      | Filter releases by type, e.g. `['Official']`. Usually not needed
-     use_file_date      |     False     | Use the file's embedded date too when looking for the oldest date
+|          Key           | Default Value | Description  |
+|:----------------------:|:-------------:| :-----:|
+|          auto          |     True      | Run oldestdate during the import phase |
+|    ignore_track_id     |     False     | During import, ignore existing track_id. Needed if using plugin on a library already tagged by MusicBrainz |
+|    filter_on_import    |     True      | During import, weight down candidates with no work_id so you are more likely to choose a recording with a work_id |
+| prompt_missing_work_id |     True      | During import, prompt to fix work_id if missing from chosen recording |
+|         force          |     False     | Run even if `recording_` tags have already been applied to the track |
+|     overwrite_date     |     False     | Overwrite the date MP3 tag field, inluding year, month, and day |
+|    overwrite_month     |     True      | If overwriting date, also overwrite month field, otherwise leave blank |
+|     overwrite_day      |     True      | If overwriting date, also overwrite day field, otherwise leave blank |
+|   filter_recordings    |     True      | Skip recordings that have attributes before fetching them. This is usually live recordings |
+|        approach        |   releases    | What approach to use to find oldest date. Possible values: `recordings, releases, hybrid, both`. `recordings` works like `beets-recordingdate` did, `releases` is a far more accurate method. Hybrid only fetches releases if no date was found in recordings. |
+|     release_types      |     None      | Filter releases by type, e.g. `['Official']`. Usually not needed |
+|     use_file_date      |     False     | Use the file's embedded date too when looking for the oldest date |
+
 
 ## Optimal Configuration
 
