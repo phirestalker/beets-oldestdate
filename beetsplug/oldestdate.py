@@ -220,6 +220,9 @@ class OldestDatePlugin(BeetsPlugin):
 
     def track_distance(self, session, info):
         dist = hooks.Distance()
+        if info.data_source != 'MusicBrainz':
+            self._log.debug('Skipping track with non MusicBrainz data source {0.artist} - {0.title}', info)
+            return dist
         if self.config['filter_on_import'] and not self._has_work_id(info.track_id):
             dist.add('work_id', 1)
 
@@ -276,7 +279,7 @@ class OldestDatePlugin(BeetsPlugin):
                 self._process_file(item)
 
     def _process_file(self, item):
-        if not item.mb_trackid:
+        if not item.mb_trackid or item.data_source != 'MusicBrainz':
             self._log.info('Skipping track with no mb_trackid: {0.artist} - {0.title}', item)
             return
 
