@@ -24,7 +24,7 @@ class OldestDatePluginTest(unittest.TestCase):
 
     def test_get_work_id_from_recording(self):
         test_recording = {"work-relation-list": [{"work": {"id": 20}}]}
-        result = oldestdate._get_work_id_from_recording(test_recording)
+        result = self.oldestdateplugin._get_work_id_from_recording(test_recording)
         self.assertEqual(20, result)
 
     def test_extract_oldest_recording_date(self):

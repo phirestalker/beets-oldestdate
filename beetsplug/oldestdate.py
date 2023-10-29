@@ -1,4 +1,5 @@
-from typing import Optional, Any, List, Dict
+import time
+from typing import Optional, Any, List, Dict, Callable, TypeVar
 import mediafile
 import musicbrainzngs
 from beets import ui, config
@@ -6,6 +7,7 @@ from beets.autotag import hooks, TrackInfo
 from beets.importer import action, ImportTask, ImportSession
 from beets.library import Item, Library
 from beets.plugins import BeetsPlugin
+from musicbrainzngs import NetworkError
 
 from .date_wrapper import DateWrapper
 
@@ -19,65 +21,11 @@ musicbrainzngs.set_useragent(
 Recording = Dict[str, Any]
 Work = Dict[str, Any]
 
-
-def _get_work_id_from_recording(recording: Recording) -> Optional[str]:
-    """Extract first valid work_id from recording"""
-    work_id = None
-
-    if 'work-relation-list' in recording:
-        for work_rel in recording['work-relation-list']:
-            if 'work' in work_rel:
-                current_work = work_rel['work']
-                if 'id' in current_work:
-                    work_id = current_work['id']
-                    break
-
-    return work_id
+MAX_RETRIES = 3
+T = TypeVar('T')
 
 
-def _contains_artist(recording: Recording, artist_ids: List[str]) -> bool:
-    """Returns whether this recording contains at least one of the specified artists"""
-    artist_found = False
-    if 'artist-credit' in recording:
-        for artist in recording['artist-credit']:
-            if 'artist' in artist:
-                artist = artist['artist']
-                if 'id' in artist and artist['id'] in artist_ids:  # Contains at least one of the identified artists
-                    artist_found = True
-                    break
-    return artist_found
-
-
-def _get_artist_ids_from_recording(recording: Recording) -> List[str]:
-    """Extract artist ids from a recording"""
-    ids = []
-
-    if 'artist-credit' in recording:
-        for artist in recording['artist-credit']:
-            if 'artist' in artist:
-                artist = artist['artist']
-                if 'id' in artist:
-                    ids.append(artist['id'])
-    return ids
-
-
-def _is_cover(recording: Recording) -> bool:
-    """Returns whether given fetched recording is a cover of a work"""
-    if 'work-relation-list' in recording:
-        for work in recording['work-relation-list']:
-            if 'attribute-list' in work:
-                if 'cover' in work['attribute-list']:
-                    return True
-    return False
-
-
-def _fetch_work(work_id: str) -> Dict[str, Any]:
-    """Fetch work, including recording relations"""
-    work: Work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
-    return work
-
-
-class OldestDatePlugin(BeetsPlugin): # type: ignore
+class OldestDatePlugin(BeetsPlugin):  # type: ignore
     _importing: bool = False
     _recordings_cache: Dict[str, Recording] = dict()
 
@@ -147,10 +95,10 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
 
         return dist
 
-    def _import_task_created(self, task: ImportTask, _: ImportSession) -> None:
+    def _import_task_created(self, task: ImportTask, session: ImportSession) -> None:
         task.item.mb_trackid = None
 
-    def _import_task_choice(self, task: ImportTask, _: ImportSession) -> None:
+    def _import_task_choice(self, task: ImportTask, session: ImportSession) -> None:
         match = task.match
         if not match:
             return
@@ -180,10 +128,79 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
                 task.choice_flag = action.SKIP
                 return
 
+    def _retry_on_network_error(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except NetworkError:
+                if attempt < MAX_RETRIES - 1:  # No need to wait after the last attempt
+                    delay: int = 2 ** attempt
+                    self._log.info(f'Network call failed, attempt {attempt}/{MAX_RETRIES}. Trying again in {delay}')
+                    time.sleep(delay)  # Exponential backoff each attempt
+                else:
+                    raise
+        assert False, "Unreachable code"  # To satisfy mypy; this will never actually be reached
+
+    def _get_work_id_from_recording(self, recording: Recording) -> Optional[str]:
+        """Extract first valid work_id from recording"""
+        work_id = None
+
+        if 'work-relation-list' in recording:
+            for work_rel in recording['work-relation-list']:
+                if 'work' in work_rel:
+                    current_work = work_rel['work']
+                    if 'id' in current_work:
+                        work_id = current_work['id']
+                        break
+
+        return work_id
+
+    def _contains_artist(self, recording: Recording, artist_ids: List[str]) -> bool:
+        """Returns whether this recording contains at least one of the specified artists"""
+        artist_found = False
+        if 'artist-credit' in recording:
+            for artist in recording['artist-credit']:
+                if 'artist' in artist:
+                    artist = artist['artist']
+                    if 'id' in artist and artist['id'] in artist_ids:  # Contains at least one of the identified artists
+                        artist_found = True
+                        break
+        return artist_found
+
+    def _get_artist_ids_from_recording(self, recording: Recording) -> List[str]:
+        """Extract artist ids from a recording"""
+        ids = []
+
+        if 'artist-credit' in recording:
+            for artist in recording['artist-credit']:
+                if 'artist' in artist:
+                    artist = artist['artist']
+                    if 'id' in artist:
+                        ids.append(artist['id'])
+        return ids
+
+    def _is_cover(self, recording: Recording) -> bool:
+        """Returns whether given fetched recording is a cover of a work"""
+        if 'work-relation-list' in recording:
+            for work in recording['work-relation-list']:
+                if 'attribute-list' in work:
+                    if 'cover' in work['attribute-list']:
+                        return True
+        return False
+
+    def _fetch_work(self, work_id: str) -> Work:
+        """Fetch work, including recording relations"""
+        work: Work = self._retry_on_network_error(
+            musicbrainzngs.get_work_by_id,
+            work_id,
+            includes=['recording-rels']
+        )['work']
+        return work
+
     def _has_work_id(self, recording_id: str) -> bool:
         """Return whether the recording has a work id"""
         recording = self._get_recording(recording_id)
-        work_id = _get_work_id_from_recording(recording)
+        work_id = self._get_work_id_from_recording(recording)
         return work_id is not None
 
     def _command_func(self, lib: Library, _: ImportSession, args: List[str]) -> None:
@@ -242,7 +259,12 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
 
     def _fetch_recording(self, recording_id: str) -> Recording:
         """Fetch and cache recording from MusicBrainz, including releases and work relations"""
-        recording: Recording = musicbrainzngs.get_recording_by_id(recording_id, ['artists', 'releases', 'work-rels'])['recording']
+        recording: Recording = self._retry_on_network_error(
+            musicbrainzngs.get_recording_by_id,
+            recording_id,
+            includes=['artists', 'releases', 'work-rels']
+        )['recording']
+
         self._recordings_cache[recording_id] = recording
         return recording
 
@@ -308,7 +330,7 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
                 else:
                     # Filter by artist, but only if cover (to avoid not matching solo careers of former groups)
                     fetched_recording = self._get_recording(rec_id)
-                    if not _contains_artist(fetched_recording, artist_ids):
+                    if not self._contains_artist(fetched_recording, artist_ids):
                         self._recordings_cache.pop(rec_id, None)  # Remove recording from cache
                         continue
             elif 'attribute-list' in rec and (self.config['filter_recordings'] or 'cover' in rec['attribute-list']):
@@ -354,9 +376,9 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
 
     def _get_oldest_date(self, recording_id: str, item_date: Optional[DateWrapper]) -> Optional[DateWrapper]:
         recording = self._get_recording(recording_id)
-        is_cover = _is_cover(recording)
-        work_id = _get_work_id_from_recording(recording)
-        artist_ids = _get_artist_ids_from_recording(recording)
+        is_cover = self._is_cover(recording)
+        work_id = self._get_work_id_from_recording(recording)
+        artist_ids = self._get_artist_ids_from_recording(recording)
 
         today = DateWrapper.today()
 
@@ -368,7 +390,7 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
             return self._iterate_dates([recording], starting_date, is_cover, artist_ids)
 
         # Fetch work, including associated recordings
-        work = _fetch_work(work_id)
+        work = self._fetch_work(work_id)
 
         if 'recording-relation-list' not in work:
             self._log.error(
