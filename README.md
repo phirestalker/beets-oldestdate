@@ -12,7 +12,7 @@ necessary. The plugin is intended to be used in singleton mode. Undefined behavi
 
 # Configuration
 
-          Key           | Default Value | Description  
+ |               Key      | Default Value | Description  
  :----------------------:|:-------------:| :-----:
           auto          |     True      | Run oldestdate during the import phase
     ignore_track_id     |     False     | During import, ignore existing track_id. Needed if using plugin on a library already tagged by MusicBrainz
@@ -40,6 +40,8 @@ necessary. The plugin is intended to be used in singleton mode. Undefined behavi
       prompt_missing_work_id: yes
       force: yes
       overwrite_date: yes
+      overwrite_month: yes
+      overwrite_day: yes
       filter_recordings: yes
       approach: 'releases'
 

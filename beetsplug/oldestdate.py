@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, List, Dict
 import mediafile
 import musicbrainzngs
 from beets import ui, config
@@ -16,8 +16,8 @@ musicbrainzngs.set_useragent(
 )
 
 # Type alias
-Recording = dict[str, Any]
-Work = dict[str, Any]
+Recording = Dict[str, Any]
+Work = Dict[str, Any]
 
 
 def _get_work_id_from_recording(recording: Recording) -> Optional[str]:
@@ -35,7 +35,7 @@ def _get_work_id_from_recording(recording: Recording) -> Optional[str]:
     return work_id
 
 
-def _contains_artist(recording: Recording, artist_ids: list[str]) -> bool:
+def _contains_artist(recording: Recording, artist_ids: List[str]) -> bool:
     """Returns whether this recording contains at least one of the specified artists"""
     artist_found = False
     if 'artist-credit' in recording:
@@ -48,7 +48,7 @@ def _contains_artist(recording: Recording, artist_ids: list[str]) -> bool:
     return artist_found
 
 
-def _get_artist_ids_from_recording(recording: Recording) -> list[str]:
+def _get_artist_ids_from_recording(recording: Recording) -> List[str]:
     """Extract artist ids from a recording"""
     ids = []
 
@@ -71,7 +71,7 @@ def _is_cover(recording: Recording) -> bool:
     return False
 
 
-def _fetch_work(work_id: str) -> dict[str, Any]:
+def _fetch_work(work_id: str) -> Dict[str, Any]:
     """Fetch work, including recording relations"""
     work: Work = musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
     return work
@@ -79,7 +79,7 @@ def _fetch_work(work_id: str) -> dict[str, Any]:
 
 class OldestDatePlugin(BeetsPlugin): # type: ignore
     _importing: bool = False
-    _recordings_cache: dict[str, Recording] = dict()
+    _recordings_cache: Dict[str, Recording] = dict()
 
     def __init__(self) -> None:
         super(OldestDatePlugin, self).__init__()
@@ -124,7 +124,7 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
                 mediafile.StorageStyle(recording_field))
             self.add_media_field(recording_field, field)
 
-    def commands(self) -> list[ui.Subcommand]:
+    def commands(self) -> List[ui.Subcommand]:
         recording_date_command = ui.Subcommand(
             'oldestdate',
             help="Retrieve the date of the oldest known recording or release of a track.",
@@ -186,7 +186,7 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
         work_id = _get_work_id_from_recording(recording)
         return work_id is not None
 
-    def _command_func(self, lib: Library, _: ImportSession, args: list[str]) -> None:
+    def _command_func(self, lib: Library, _: ImportSession, args: List[str]) -> None:
         """This queries the local database, not the files."""
         for item in lib.items(args):
             self._process_file(item)
@@ -251,7 +251,7 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
         return self._recordings_cache[
             recording_id] if recording_id in self._recordings_cache else self._fetch_recording(recording_id)
 
-    def _extract_oldest_recording_date(self, recordings: list[Recording], starting_date: DateWrapper,
+    def _extract_oldest_recording_date(self, recordings: List[Recording], starting_date: DateWrapper,
                                        is_cover: bool, approach: str) -> DateWrapper:
         """Get oldest date from a recording"""
         oldest_date = starting_date
@@ -286,8 +286,8 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
 
         return oldest_date
 
-    def _extract_oldest_release_date(self, recordings: list[Recording], starting_date: DateWrapper,
-                                     is_cover: bool, artist_ids: list[str]) -> DateWrapper:
+    def _extract_oldest_release_date(self, recordings: List[Recording], starting_date: DateWrapper,
+                                     is_cover: bool, artist_ids: List[str]) -> DateWrapper:
         """Get oldest date from a release"""
         oldest_date = starting_date
         release_types = self.config['release_types'].get()
@@ -336,8 +336,8 @@ class OldestDatePlugin(BeetsPlugin): # type: ignore
 
         return oldest_date
 
-    def _iterate_dates(self, recordings: list[Recording], starting_date: DateWrapper,
-                       is_cover: bool, artist_ids: list[str]) -> Optional[DateWrapper]:
+    def _iterate_dates(self, recordings: List[Recording], starting_date: DateWrapper,
+                       is_cover: bool, artist_ids: List[str]) -> Optional[DateWrapper]:
         """Iterates through a list of recordings and returns oldest date"""
         approach = self.config['approach'].get()
         oldest_date = starting_date
