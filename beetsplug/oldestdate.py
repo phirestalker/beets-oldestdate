@@ -21,8 +21,6 @@ musicbrainzngs.set_useragent(
 Recording = Dict[str, Any]
 Work = Dict[str, Any]
 
-MAX_RETRIES = 3
-T = TypeVar('T')
 
 
 class OldestDatePlugin(BeetsPlugin):  # type: ignore
@@ -44,7 +42,8 @@ class OldestDatePlugin(BeetsPlugin):  # type: ignore
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
             'release_types': None,  # Filter by release type, e.g. ['Official']
-            'use_file_date': False  # Also use file's embedded date when looking for oldest date
+            'use_file_date': False,  # Also use file's embedded date when looking for oldest date
+            'max_network_retries': 3  # Maximum amount of times a given network call will be retried
         })
 
         if self.config['auto']:
@@ -128,14 +127,16 @@ class OldestDatePlugin(BeetsPlugin):  # type: ignore
                 task.choice_flag = action.SKIP
                 return
 
+    T = TypeVar('T')
     def _retry_on_network_error(self, func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-        for attempt in range(MAX_RETRIES):
+        max_retries: int = self.config['max_network_retries'].get()
+        for attempt in range(max_retries):
             try:
                 return func(*args, **kwargs)
             except NetworkError:
-                if attempt < MAX_RETRIES - 1:  # No need to wait after the last attempt
+                if attempt < max_retries - 1:  # No need to wait after the last attempt
                     delay: int = 2 ** attempt
-                    self._log.info(f'Network call failed, attempt {attempt}/{MAX_RETRIES}. Trying again in {delay}')
+                    self._log.info(f'Network call failed, attempt {attempt}/{max_retries}. Trying again in {delay}')
                     time.sleep(delay)  # Exponential backoff each attempt
                 else:
                     raise
