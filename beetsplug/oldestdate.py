@@ -5,7 +5,7 @@ from beets.autotag import hooks
 from beets.importer import action
 from beets.plugins import BeetsPlugin
 
-from date_wrapper import DateWrapper
+from .date_wrapper import DateWrapper
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
