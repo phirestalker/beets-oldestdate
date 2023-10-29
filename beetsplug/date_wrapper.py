@@ -1,4 +1,6 @@
 import datetime
+from typing import Optional
+
 from dateutil import parser
 
 
@@ -9,7 +11,8 @@ class DateWrapper(datetime.datetime):
     with the month and day being optional.
     """
 
-    def __new__(cls, y: int = None, m: int = None, d: int = None, iso_string: str = None):
+    def __new__(cls, y: Optional[int] = None, m: Optional[int] = None, d: Optional[int] = None,
+                iso_string: Optional[str] = None):
         """
         Create a new datetime object using a convenience wrapper.
         Must specify at least one of either year or iso_string.
@@ -38,7 +41,8 @@ class DateWrapper(datetime.datetime):
         today = datetime.date.today()
         return DateWrapper(today.year, today.month, today.day)
 
-    def __init__(self, y=None, m=None, d=None, iso_string=None):
+    def __init__(self, y: Optional[int] = None, m: Optional[int] = None, d: Optional[int] = None,
+                 iso_string: Optional[str] = None):
         if y is not None:
             self.y = min(max(y, datetime.MINYEAR), datetime.MAXYEAR)
             self.m = m if (m is None or 0 < m <= 12) else 1
