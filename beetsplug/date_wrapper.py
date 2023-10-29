@@ -5,8 +5,8 @@ from dateutil import parser
 class DateWrapper(datetime.datetime):
     """
     Wrapper class for datetime objects.
-    Allows comparison between dates taking into
-    account the month and day being optional.
+    Allows comparison between dates,
+    with the month and day being optional.
     """
 
     def __new__(cls, y: int = None, m: int = None, d: int = None, iso_string: str = None):
@@ -23,10 +23,13 @@ class DateWrapper(datetime.datetime):
             month = m if (m is not None and 0 < m <= 12) else 1
             day = d if (d is not None and 0 < d <= 31) else 1
         elif iso_string is not None:
+            # Replace question marks with first valid field
+            iso_string = iso_string.replace("??", "01")
+
             parsed = parser.isoparse(iso_string)
             return datetime.datetime.__new__(cls, parsed.year, parsed.month, parsed.day)
         else:
-            raise TypeError("Must specify a value for year or a date string")
+            raise TypeError("Must either specify a value for year, or a date string")
 
         return datetime.datetime.__new__(cls, year, month, day)
 
@@ -52,11 +55,18 @@ class DateWrapper(datetime.datetime):
             self.m = None
             self.d = None
 
-            # Month and day are optional
+            # Month and day are optional. Sometimes fields are missing or contain ??
             if length >= 6:
-                self.m = int(iso_string[4:6])
+                try:
+                    self.m = int(iso_string[4:6])
+                except ValueError:
+                    pass
                 if length >= 8:
-                    self.d = int(iso_string[6:8])
+                    try:
+                        self.d = int(iso_string[6:8])
+                    except ValueError:
+                        pass
+
         else:
             raise TypeError("Must specify a value for year or a date string")
 

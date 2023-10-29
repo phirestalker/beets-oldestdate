@@ -20,6 +20,17 @@ class DateWrapperTest(unittest.TestCase):
         self.assertEqual(10, result.m)
         self.assertEqual(1, result.d)
 
+    def test_invalid_chars(self):
+        first = DateWrapper(iso_string="2022-??-10")
+        self.assertEqual(2022, first.y)
+        self.assertEqual(None, first.m)
+        self.assertEqual(10, first.d)
+        second = DateWrapper(iso_string="2022-10-??")
+        self.assertEqual(2022, second.y)
+        self.assertEqual(10, second.m)
+        self.assertEqual(None, second.d)
+        self.assertTrue(second < first)
+
     # Force year to be within range 1 - 9999
     def test_year_zero(self):
         result = DateWrapper(0, 12, 10)
