@@ -10,7 +10,7 @@ from .date_wrapper import DateWrapper
 
 musicbrainzngs.set_useragent(
     "Beets oldestdate plugin",
-    "1.1.4",
+    '1.1.4',  # Also change in pyproject.toml
     "https://github.com/kernitus/beets-oldestdate"
 )
 
@@ -65,6 +65,7 @@ def _is_cover(recording):
                     return True
     return False
 
+
 # Fetch work, including recording relations
 def _fetch_work(work_id):
     return musicbrainzngs.get_work_by_id(work_id, ['recording-rels'])['work']
@@ -84,6 +85,8 @@ class OldestDatePlugin(BeetsPlugin):
             'prompt_missing_work_id': True,  # During import, prompt to fix work_id if missing
             'force': False,  # Run even if already processed
             'overwrite_date': False,  # Overwrite date field in tags
+            'overwrite_month': True,  # If overwriting date, also overwrite month field
+            'overwrite_day': True,  # If overwriting date and month, also overwrite day
             'filter_recordings': True,  # Skip recordings with attributes before fetching them
             'approach': 'releases',  # recordings, releases, hybrid, both
             'release_types': None,  # Filter by release type, e.g. ['Official']
@@ -222,8 +225,8 @@ class OldestDatePlugin(BeetsPlugin):
                 'Overwriting date field for: {0.artist} - {0.title} from {0.year}-{0.month}-{0.day} to {1}-{2}-{3}',
                 item, year_string, month_string, day_string)
             item.year = "" if oldest_date.y is None else year_string
-            item.month = "" if oldest_date.m is None else month_string
-            item.day = "" if oldest_date.d is None else day_string
+            item.month = "" if (oldest_date.m is None or not self.config['overwrite_month']) else month_string
+            item.day = "" if (oldest_date.d is None or not self.config['overwrite_day']) else day_string
 
         self._log.info('Applying changes to {0.artist} - {0.title}', item)
         item.store()

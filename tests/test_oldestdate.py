@@ -1,12 +1,11 @@
 import unittest
 from unittest import mock
-from unittest.mock import patch, PropertyMock
+from unittest.mock import patch
 
-from beets.plugins import BeetsPlugin
+from beets.library import Item
 
 from beetsplug import oldestdate
 from beetsplug.date_wrapper import DateWrapper
-from beets.library import Item
 
 
 class OldestDatePluginTest(unittest.TestCase):
